@@ -1,0 +1,47 @@
+FC = <FC>
+
+ifeq ($(TARGET),)
+  TARGET = mapfl
+endif
+
+FFLAGS = <FFLAGS> -I<HDF5_INCLUDE_DIR>
+
+OBJS = number_types.o \
+ zm_parse_modules.o \
+ zm_parse.o \
+ psi_io.o \
+ magnetic_field_function_modules.o \
+ magnetic_field_function.o \
+ mapfl.o
+
+LDFLAGS = -L<HDF5_LIB_DIR> <HDF5_LIB_FLAGS>
+
+all: $(OBJS)
+	$(FC) $(FFLAGS) $(OBJS) $(LDFLAGS) -o mapfl
+	rm *.o *.mod
+
+clean:
+	rm -f *.mod *.o *.so 2>/dev/null
+	rm mapfl 2>/dev/null
+
+number_types.o: number_types.f
+	$(FC) -c $(FFLAGS) $<
+
+zm_parse_modules.o: zm_parse_modules.f
+	$(FC) -c $(FFLAGS) $<
+
+zm_parse.o: zm_parse.f zm_parse_modules.f number_types.f
+	$(FC) -c $(FFLAGS) $<
+
+psi_io.o: psi_io.f90
+	$(FC) -c $(FFLAGS) $<
+
+magnetic_field_function_modules.o: magnetic_field_function_modules.f
+	$(FC) -c $(FFLAGS) $<
+
+magnetic_field_function.o: magnetic_field_function.f
+	$(FC) -c $(FFLAGS) $<
+
+mapfl.o: mapfl.f
+	$(FC) -c $(FFLAGS) $<
+

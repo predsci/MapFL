@@ -1,0 +1,29 @@
+&datum
+!
+! File names for B field:
+!
+  bfile%r='br.h5'
+  bfile%t='bt.h5'
+  bfile%p='bp.h5'
+!
+! Use cubic interpolation for B [.true.|.false.]:
+!
+  cubic=.true.
+!
+! Compute a coronal hole (open field) map [.true.|.false.]:
+!
+  compute_ch_map=.true.
+!
+! Radius at which to compute the coronal hole (open field) map:
+!
+  ch_map_r=1.
+!
+! File name for the coronal hole map output file:
+!
+  ch_map_output_file='ofm.h5'
+/
+!
+! This input file computes a coronal hole (open field) 
+! map at the same theta-phi resolution as the input 
+! magnetic field data at r=1.
+!

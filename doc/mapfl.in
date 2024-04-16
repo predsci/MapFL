@@ -1,0 +1,172 @@
+&datum
+  verbose = 0
+!File names for B field:
+  bfile%r=' '
+  bfile%t=' '
+  bfile%p=' '
+!Use an analytic magnetic field function [.true.|.false.]:
+  use_analytic_function=.false.
+!File name for analytic magnetic field function parameters:
+  function_params_file='magfield_function_params.dat'
+!Use cubic interpolation for B [.true.|.false.]:
+  cubic=.false.
+!Debugging level [0 => do not print debug info]:
+  debug_level=0
+!Compute a coronal hole map [.true.|.false.]:
+  compute_ch_map=.false.
+!Radius at which to compute the coronal hole map:
+  ch_map_r=1.
+!File name for the coronal hole map output file:
+  ch_map_output_file='OFM_r100.h5'
+!Compute a 3D coronal hole map [.true.|.false.]:
+  compute_ch_map_3d=.false.
+!File name for the coronal hole map output file:
+  ch_map_3d_output_file='ch3d.h5'
+!Field line tracing step size multiplier [DSMULT; multiplies all step sizes]:
+  dsmult=1.
+!Use a variable step size for the field line integration [.true.|.false.]:
+  ds%variable=.true.
+!Step size as a fraction of radius of curvature [for variable step size]:
+  ds%over_rc=0.0025
+!Automatically set the min and max step size [.true.|.false.]:
+  set_ds_automatically=.true.
+!Minimum field line tracing step size [not used for auto ds set]:
+  ds%min=.001
+!Maximum field line tracing step size [not used for auto ds set]:
+  ds%max=.01
+!Limit the field line tracing step size by the local B mesh [.true.|.false.]:
+  ds%limit_by_local_mesh=.true.
+!Fraction of local mesh size to limit by:
+  ds%local_mesh_factor=1.
+!Maximum arc length for a field line integration [LMAX]:
+  ds%lmax=100.
+!Trace forward from R0 to R1 [.true.|.false.]:
+  trace_fwd=.false.
+!File name for forward mapping radius file:
+  rffile=' '
+!File name for forward mapping theta file:
+  tffile=' '
+!File name for forward mapping phi file:
+  pffile=' '
+!File name for forward mapping expansion factor file:
+  effile=' '
+!File name for forward mapping K factor file:
+  kffile=' '
+!File name for forward mapping Q factor file:
+  qffile=' '
+!File name for forward mapping SLOG(Q) factor file:
+  slogqffile=' '
+!File name for forward mapping field line length file:
+  lffile=' '
+!Trace backward from R1 to R0 [.true.|.false.]:
+  trace_bwd=.false.
+!File name for backward mapping radius file:
+  rbfile=' '
+!File name for backward mapping theta file:
+  tbfile=' '
+!File name for backward mapping phi file:
+  pbfile=' '
+!File name for backward mapping expansion factor file:
+  ebfile=' '
+!File name for backward mapping K factor file:
+  kbfile=' '
+!File name for backward mapping Q factor file:
+  qbfile=' '
+!File name for backward mapping SLOG(Q) factor file:
+  slogqbfile=' '
+!File name for backward mapping field line length file:
+  lbfile= ' '
+!Flag to use different r mesh than that in the B files [.true.|.false.]:
+  new_r_mesh=.false.
+!Name of a 1D HDF file containing the r mesh [' ' => use the uniform mesh]:
+  mesh_file_r=' '
+!Number of points in the uniform r mesh:
+  nrss=54
+!Uniform r mesh limits [R0,R1; use R0=R1=0 for a full domain]:
+  r0=1.0
+  r1=2.5
+!Flag to use different t mesh than that in the B files [.true.|.false.]:
+  new_t_mesh=.false.
+!Name of a 1D HDF file containing the t mesh [' ' => use the uniform mesh below]:
+  mesh_file_t= ' '
+!Number of points in the uniform t mesh:
+  ntss=181
+!Uniform t mesh limits [T0,T1; use T0=T1=0. for a full domain]:
+  t0=0.
+  t1=0.
+!Flag to use different p mesh than that in the B files [.true.|.false.]:
+  new_p_mesh=.false.
+!Name of a 1D HDF file containing the p mesh [' ' => use the uniform mesh below]:
+  mesh_file_p=' '
+!Number of points in the uniform p mesh:
+  npss=361
+!Uniform p mesh limits [P0,P1; use P0=P1=0. for a full domain]:
+  p0=0.
+  p1=0.
+!Compute a mapping in 3D [.true.|.false.]:
+  trace_3d=.false.
+!File name for the output 3D mapping r file:
+  volume3d_output_file%r=' '
+!File name for the output 3D mapping t file:
+  volume3d_output_file%t=' '
+!File name for the output 3D mapping p file:
+  volume3d_output_file%p=' '
+!Compute the mapping on a "slice" [.true.|.false.]:
+  trace_slice=.false.
+!Slice coordinates are Cartesian [.true.|.false.]:
+  slice_coords_are_xyz=.false.
+!Tracing direction is along B [.true.] or along increasing radius [.false.]:
+  trace_slice_direction_is_along_b=.true.
+!Compute Q directly on the slice [.true.|.false.]:
+  compute_q_on_slice=.false.
+!Increment for calculating Q on the slice [H]:
+  q_increment_h=.0001
+!File name for the slice input r|x file:
+  slice_input_file%r=' '
+!File name for the slice input t|y file:
+  slice_input_file%t=' '
+!File name for the slice input p|z file:
+  slice_input_file%p=' '
+!Trace field lines forward [.true.|.false.]:
+  trace_from_slice_forward=.false.
+!File name for the forward trace slice output mapping r|x file:
+  slice_output_file_forward%r=' '
+!File name for the forward trace slice output mapping t|y file:
+  slice_output_file_forward%t=' '
+!File name for the forward trace slice output mapping p|z file:
+  slice_output_file_forward%p=' '
+!Trace field lines backward [.true.|.false.]:
+  trace_from_slice_backward=.false.
+!File name for the backward trace slice output mapping r|x file:
+  slice_output_file_backward%r=' '
+!File name for the backward trace slice output mapping t|y file:
+  slice_output_file_backward%t=' '
+!File name for the backward trace slice output mapping p|z file:
+  slice_output_file_backward%p=' '
+!File name for the slice output Q file:
+  slice_q_output_file=' '
+!File name for the field line length on the slice:
+  slice_length_output_file=' '
+!Flag to write slice field line traces to HDF files [.true.|.false.]:
+  write_traces_to_hdf=.false.
+!String for the root file name for field line trace output files:
+  write_traces_root='fl'
+!Flag to write (x,y,z) coordinates of the field line traces [.true.|.false.]:
+  write_traces_as_xyz=.false.
+!Compute a 3D dips map [.true.|.false.]:
+  compute_dips_map_3d=.false.
+!File name for the dips map output file:
+  dips_map_3d_output_file='dips3d.h5'
+!Numer of segments to search for dips:
+  ns_dips=10
+!Minimum allowed lower radial boundary position [R0]:
+  domain_r_min=1.
+!Maximum allowed upper radial boundary position [R1]:
+  domain_r_max=300.
+!Integrate a scalar field along field lines
+  integrate_along_fl=.false.
+!File name for scalar field to be integrated along field lines  
+  scalar_input_file=' '
+/
+! These represent the default values of parameters in MAPFL.
+! This file should be updated to reflect any changes to MAPFL in the future.
