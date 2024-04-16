@@ -9,17 +9,17 @@
 #################################################################
 
 # Location of local hdf5 installed with same compiler being used for POT3D:
-HDF5_INCLUDE_DIR="/usr/include/hdf5/serial"
-HDF5_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+HDF5_INCLUDE_DIR=""
+HDF5_LIB_DIR=""
 # Fortran HDF5 library flags (these can be version dependent):
-HDF5_LIB_FLAGS="-lhdf5_serial_fortran -lhdf5_serialhl_fortran -lhdf5_serial -lhdf5_serial_hl"
+HDF5_LIB_FLAGS=""
 
 ###########################################################################
 # Please set the compile flags based on your compiler and hardware setup.
 ###########################################################################
 
-FC="gfortran"
-FFLAGS="-O3 -fopenmp"
+FC=""
+FFLAGS=""
 
 ###########################################################################
 ###########################################################################

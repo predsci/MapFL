@@ -1,349 +1,69 @@
-c
-c-----------------------------------------------------------------------
-c
-c ****** Get the field line mapping for MAS code runs, computing
-c ****** the structural quantities K and Q.
-c
-c-----------------------------------------------------------------------
-c
-c ****** Updates and bug fixes:
-c
-c        08/30/2005, ZM, Version 1.06:
-c
-c         - Converted MAPFL v1.05 into a tool.
-c         - Improved the tracing accuracy of short field lines
-c           (e.g., those near the neutral line).
-c         - Improved the field line integrator.
-c         - Added the ability to perform a 3D mapping of the
-c           field lines.
-c
-c        06/16/2006, ZM, Version 1.07:
-c
-c         - Fixed the effect of rondoff errors in generating the
-c           meshes for the calculation which caused initial points
-c           to lie outside the computation domain.
-c
-c        06/21/2006, ZM, Version 1.08:
-c
-c         - Allowed the ability of specifying planes for the
-c           field line mapping region and the 3D mapping.
-c           This extends the capability of the tool to get
-c           Q on 2D slices.
-c
-c        07/07/2006, ZM, Version 1.09:
-c
-c         - Added the ability to do new POT3D files,
-c           new-old POT3D files, and old POT3D files.
-c
-c        08/22/2006, ZM, Version 1.10:
-c
-c         - Corrected a bug in the computation of Q for field
-c           lines that wrap periodically at the join between
-c           phi=0 and phi=2*pi.
-c         - Corrected the computation of Q on open field lines
-c           to take into account the difference in the radii
-c           of the initial and final field line footpoints.
-c         - Added the ability to use cubic spline interpolation.
-c           This increases the storage requirements substantially,
-c           and makes the computation significantly slower.
-c
-c        09/17/2006, ZM, Version 1.11:
-c
-c         - Reverted to the Cartesian field line integrator.
-c           The accuracy of the spherical integrator was being
-c           cast into doubt, though it was not proven to be
-c           bad.
-c         - Improved the accuracy with which the final point
-c           (i.e., the end point at the r boundaries) was
-c           being clipped to the boundary.
-c         - Changed the computation of Q to be staggered with
-c           respect to the mapping quantities.
-c         - Fixed the backward mapping routine to compute Q.
-c
-c        09/29/2006, ZM, Version 1.12:
-c
-c         - Improved the field line integrator to use a variable
-c           step size.  It is now possible to select either a uniform
-c           step size for the field line integration, as before,
-c           or to use a variable step size based on the local radius
-c           of curvature of the field line, and the local mesh size
-c           of the B files along the field line trace.
-c         - This has changed the format of the input file.
-c
-c        01/28/2007, ZM, Version 1.13:
-c
-c         - Added the ability to compute the mapping on 2D slices
-c           through the 3D volume.
-c         - This has changed the format of the input file.
-c         - Cleaned up some formatting of the output.
-c
-c        02/19/2008, ZM, Version 1.14:
-c
-c         - Changed the default behavior that terminated the code
-c           when more than 100 bad field line traces were found.
-c           By default this is now disabled, but can be put back
-c           by setting the variable MAX_BAD_FIELDLINES.
-c
-c        04/06/2009, ZM, Version 1.15:
-c
-c         - Added the ability to use an analytic function to define
-c           the magnetic field.
-c         - Corrected bugs involving how the expansion factor and Q
-c           were computed for the backward trace.
-c         - Performed a cosmetic clean-up of the code.
-c
-c        04/21/2009, ZM, Version 1.16:
-c
-c         - Added the ability to use Slava's new formulation
-c           to compute Q directly on slices within the domain
-c           by tracing a bundle of field lines from points in
-c           the domain forward and backward to the boundaries.
-c         - Cleaned up the way mapping along "slices" in the 3D
-c           volume is implemented.  These "slices" can now be
-c           lines (i.e., 1D files), 2D slices, or 3D volumes.
-c           These are all defined by reading in rectilinear
-c           files (1D, 2D, or 3D) that contain the (r,t,p) or
-c           (x,y,z) starting coordinates for the mapping.
-c         - Added a check to make sure that the input file
-c           has the correct number of lines.
-c
-c        02/18/2010, ZM, Version 1.17:
-c
-c         - Made the ability to trace from a slice more flexible.
-c           It is now possible to map from a slice along the
-c           forward and backward directions separately.  It is
-c           also possible to specify this direction to be either
-c           along B or along the direction of increasing radius.
-c         - Added the ability to directly compute coronal hole
-c           maps at a given radius.  These are coded by magnetic
-c           field polarity.
-c
-c        04/12/2010, ZM, Version 1.18:
-c
-c         - Added the ability of specifying the r, t, and p meshes
-c           to be used for the calculation.  These can be specified
-c           as 1D HDF files or as uniform meshes.
-c         - Allowed the phi coordinate to be outside the [0,2*pi]
-c           range in the input file.  It is now properly wrapped
-c           into the main interval during the calculation.
-c
-c        04/26/2010, ZM, Version 1.19:
-c
-c         - Added the ability to compute 3D coronal hole maps.
-c           These are useful to compute 3D open/closed field regions
-c           for use, perhaps, in developing heating masks.
-c         - Removed the writing of warning messages about field
-c           lines that did not reach the boundaries in the coronal
-c           hole map traces.  This was not really necessary since
-c           such field lines are already flagged (with values of
-c           "-2") in the coronal hole maps.
-c
-c        02/07/2011, ZM, Version 1.20:
-c
-c         - Added a multi-threading capability using OpenMP.
-c           This version runs in parallel.  This required a
-c           restructuring of the code to improve the modularity,
-c           to make the code thread-safe, and to improve the
-c           parallel performance.
-c         - It is necessary to use "thread-safe" programming
-c           in the parallel sections from now on.
-c
-c        05/18/2011, ZM, Version 1.21:
-c
-c         - Corrected a bug in the periodic wrapping of the phi
-c           coordinate when it was outside the range [0,2*pi].
-c           It was not being wrapped to the main periodic interval
-c           in the GETB routine.
-c
-c        08/17/2012, ZM, Version 1.22:
-c
-c         - Fixed a minor bug that was discovered by compiling
-c           with GFORTRAN.
-c
-c        04/29/2013, ZM, Version 1.23:
-c
-c         - Changed the interpretation of the value of DEBUG_LEVEL
-c           for debugging output.  This was done to optimize
-c           Slava's output of field line traces.  The functionality
-c           of the program was not otherwise modified.
-c
-c        05/13/2013, ZM, Version 1.24:
-c
-c         - Added the ability to write field line traces to HDF
-c           files.  This option can be selected when tracing from
-c           a "slice".  It is not intended to be used when doing
-c           very high resolution mapping computations, since it
-c           can produce a large amount of data.  To get the HDF
-c           files, set DEBUG_LEVEL.ge.2.  The field lines traces
-c           for the forward and/or backward trace will be written
-c           to HDF files named:
-c
-c             field_line_traces_forward_rtp.hdf
-c             field_line_traces_forward_xyz.hdf
-c             field_line_traces_backward_rtp.hdf
-c             field_line_traces_backward_xyz.hdf
-c
-c        09/25/2015, ZM, Version 1.25:
-c
-c         - Changed the way short field lines are treated.
-c           Because of strange behavior noticed by Slava in a
-c           certain case, I changed the way the step size for
-c           "short" field lines was controlled.  It turned out
-c           that a "short" field line could become a very long
-c           field line when retraced!  Previously, these field
-c           lines were retraced with the miniumum step size, which
-c           led to a very long field line with lots of points.
-c           I relaxed this requirement on the step size once the
-c           number of points in the retraced field line exceeded
-c           the minimum number of points.
-c
-c        01/20/2016, RC, Version 1.26:
-c
-c         - Modified tracefl() routine to eliminate the use of "goto"s.
-c         - Minor speed improvements (~3%).
-c         - Manually added spline library into code to allow
-c           for the development of future optimizations.
-c
-c        02/09/2016, ZM, Version 1.26ZM:
-c
-c         - Fixed the check that adds a phi point to the B arrays
-c           for cases when all the B components are on the same
-c           mesh.  The code now checks if the point at phi=2*pi is
-c           already present, and only adds a point if it is not.
-c         - Fixed the storage of field line traces in the field line
-c           buffers.  Previously, when "short" field lines were
-c           detected, the buffers were not reinitialized when these
-c           short field lines were retraced with a smaller step size,
-c           leading to incorrect saved field line traces.
-c         - Fixed the computation of Q on slices for field line
-c           footpoints that approach the poles in routine GETQ.
-c           The previous differencing was not accurate for field
-c           line footpoints near the poles.  The new scheme switches
-c           to Cartesian basis vectors in a small neighborhood of
-c           the poles.
-c
-c        03/25/2016, ZM, Version 1.27ZM:
-c
-c         - Added code to snap the theta and phi limits of the B
-c           meshes to the correct values.  Previously, these could
-c           be slightly off due to the precision limitations of
-c           32-bit HDF files, leading to possible errors in the
-c           tracing of a (very small) subset of field lines.
-c
-c        04/19/2016, ZM, Version 1.28ZM:
-c
-c         - Added the ability to write the field line length when
-c           mapping forward/backward, and also when computing
-c           Q on a slice.
-c         - Added the ability to write traces of field lines traced
-c           from a slice to individual HDF output files.  These are
-c           named:
-c
-c              <root>_f_####.hdf
-c              <root>_b_####.hdf
-c
-c           where <root> is a string specified in the input file,
-c           and #### is a four-digit sequence number (0001, 0002,
-c           etc.).  The "f" and "b" labels designate forward/backward
-c           traces, as requested in the input file.  There is a flag
-c           in the input file to select whether Cartesian (x,y,z)
-c           coordinates or spherical (r,t,p) coordinates are
-c           written.
-c         - Removed the ability to write field lines to a single HDF
-c           file when the debug level was set to 2.  This is
-c           superseded by the new capability to write the traces to
-c           individual HDF files.
-c         - COMPTIBILITY CHANGE:  The changes in this version have
-c           modified the format
-c           of the input file, so unfortunately this version is
-c           not backward compatible.
-c
-c        01/17/2018, ZM, Version 1.29ZM:
-c
-c         - Changed the way the domain limits are set from the
-c           scales in the magnetic field files.  This is an attempt
-c           to make sure that roundoff does not cause points that
-c           are near theta=pi and phi=2*pi to end up outside the
-c           domain.
-c
-c        01/18/2018, RC, Version 1.30:
-c
-c         - Merged in 1.26ZM, 1.27ZM, 1.28ZM, and 1.29ZM changes.
-c         - Removed the small speed improvement from 1.26 for
-c           consistency reasons.
-c
-c        03/19/2018, RC, Version 1.31:
-c
-c         - Small change to allow HDF5 trace output files if
-c           input b files are HDF5.
-c
-c        05/10/2018, RC, Version 1.32:
-c
-c         - Added OpenMP to 3D cubic spline coef calculation.
-c
-c        05/20/2019, RL, Version 1.33:
-c
-c         - Added 3D dips map.
-c
-c        06/28/2019, RL, Version 2.00:
-c
-c         - COMPATIBILITY CHANGE!!!!
-c           Replaced formatted input file with namelist!
-c
-c        07/01/2019, RC, Version 2.01:
-c
-c         - Added option to output Slava's signed-log10
-c           of Q for forward and backward traces. To use, set
-c           SLOGQFFILE and/or SLOGQBFILE to desired output filenames.
-c         - Set default values for all namelist parameters and updated
-c           mapfl.dat to reflect the default values.
-c         - Added error-checking for namelist.
-c
-c        07/11/2019, RC, Version 2.02:
-c
-c         - Fixed bug in writing out backward mapping slogq.
-c
-c        07/12/2019, RC, Version 2.03:
-c
-c         - Fixed bug in writing out backward mapping slogq (again).
-c
-c        08/19/2019, RL, Version 2.04:
-c
-c         - Introduced capability to integrate scalar field along
-c           field lines. 
-c           Speficy INTEGRATE_ALONG_FL=.true. and the name of the
-c           file with the field in SCALAR_INPUT_FILE
-c           Either TRACE_FWD, or TRACE_BWD, or TRACE_SLICE and 
-c           COMPUTE_Q_ON_SLICE, must be set true.
-c           Specify the file with integrated quantity in LFFILE
-c           (for TRACE_FWD or TRACE_BWD true) or in 
-c           SLICE_LENGTH_OUTPUT_FILE (for TRACE_SLICE and 
-c           COMPUTE_Q_ON_SLICE true).
-c
-c        03/02/2021, AP,CD Version 2.0.5:
-c
-c         - Small modifications for Python/f2py cross compilation.
-c         - Debug statements in mesh detection, tweak to OLD MAS check.
-c         - Changed version numbering to standard style.
-c
-c        05/10/2022, EM,CD Version 2.0.6:
-c
-c         - Changed logic for slice mapping. If compute_q_on_slice
-c           is true, then the direct mapping will also be done after.
-c         - This makes it easier to get everything at once.
-c
-c-----------------------------------------------------------------------
-c
 c#######################################################################
 c
-c ****** This tool uses modules from ZM's tools library.
+c-----------------------------------------------------------------------
+c
+c     __  __      _      ____    _____   _
+c    |  \/  |    / \    |  _ \  |  ___| | |
+c    | |\/| |   / _ \   | |_) | | |_    | |
+c    | |  | |  / ___ \  |  __/  |  _|   | |___
+c    |_|  |_| /_/   \_\ |_|     |_|     |_____|
+c
+c
+c ****** MAPFL: Map field lines through a 3D vector field.
+c
+c     Authors:  Zoran Mikic
+c               Jon Linker
+c               Cooper Downs
+c               Roberto Lionello
+c               Ronald M. Caplan
+c               Emily Mason
+c
+c     Predictive Science Inc.
+c     www.predsci.com
+c     San Diego, California, USA 92121
+c
+c#######################################################################
+c Copyright 2024 Predictive Science Inc.
+c
+c Licensed under the Apache License, Version 2.0 (the "License");
+c you may not use this file except in compliance with the License.
+c You may obtain a copy of the License at
+c
+c    http://www.apache.org/licenses/LICENSE-2.0
+c
+c Unless required by applicable law or agreed to in writing, software
+c distributed under the License is distributed on an "AS IS" BASIS,
+c WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+c implied.
+c See the License for the specific language governing permissions and
+c limitations under the License.
+c#######################################################################
 c
 c#######################################################################
       module ident
 c
+c-----------------------------------------------------------------------
+c ****** Set the name, version, and date of code.
+c-----------------------------------------------------------------------
+c
+c
       character(*), parameter :: cname='MAPFL'
-      character(*), parameter :: cvers='2.0.6'
-      character(*), parameter :: cdate='05/10/2022'
+      character(*), parameter :: cvers='2.1.0'
+      character(*), parameter :: cdate='04/16/2024'
+c
+      end module
+c#######################################################################
+      module number_types
+c
+c-----------------------------------------------------------------------
+c ****** Set precisions for REALs.
+c-----------------------------------------------------------------------
+c
+      use iso_fortran_env
+c
+c ****** Use double precision.
+c
+      integer, parameter :: r_typ = REAL64
 c
       end module
 c#######################################################################
@@ -430,6 +150,7 @@ c#######################################################################
         type(itab), optional :: tab
         integer, optional :: ierr
         integer :: locate_interval
+        intent(in) :: n,x,xv,tab
         end
       end interface
       end module
@@ -922,7 +643,7 @@ c
 c
       implicit none
 c
-      logical :: gather_stats
+      integer :: gather_stats = 0
 c
       integer(8) :: stat_n=0
       real(r_typ) :: stat_ds_sum=0._r_typ
@@ -956,8 +677,8 @@ c
 c
       implicit none
 c
-      character(512) :: infile
-      logical :: verbose
+      character(len=:), allocatable :: infile
+      integer :: verbose = 0
 c
       end module
 c#######################################################################
@@ -974,6 +695,8 @@ c#######################################################################
         integer :: ip1
         real(r_typ) :: alpha
         type(itab), optional :: tab
+        intent(in) :: n,x,xv,tab
+        intent(out) :: i,ip1,alpha
         end
       end interface
       end module
@@ -991,6 +714,8 @@ c#######################################################################
         real(r_typ) :: s
         logical :: traced_to_r_boundary
         type(traj), optional :: xt
+        intent(in) :: b,ds,s0
+        intent(out) :: s1,bs0,bs1,s,traced_to_r_boundary
         end
       end interface
       end module
@@ -1013,6 +738,61 @@ c
 c
       end module
 c#######################################################################
+      module magfld_func_def
+c
+c-----------------------------------------------------------------------
+c ****** Definition of the analytic function that defines B.
+c-----------------------------------------------------------------------
+c
+      implicit none
+c
+c ****** Number of defined functions.
+c
+      integer, parameter :: number_of_functions=2
+c
+c ****** Mnemonics for defined functions.
+c ****** There should be NUMBER_OF_FUNCTIONS of these.
+c
+      integer, parameter :: FUNC_TYPE_DIPOLE           =1
+      integer, parameter :: FUNC_TYPE_PFSS_BKG         =2
+c
+      end module
+c#######################################################################
+      module magfld_func_index
+c
+c-----------------------------------------------------------------------
+c ****** Index for the analytic function that defines B.
+c-----------------------------------------------------------------------
+c
+      implicit none
+c
+c ****** Selected function index.
+c
+      integer :: function_index=0
+c
+      end module
+c#######################################################################
+      module magfld_func_params
+c
+c-----------------------------------------------------------------------
+c ****** Parameters for the analytic function that defines B.
+c-----------------------------------------------------------------------
+c
+      use number_types
+c
+      implicit none
+c
+c ****** Parameters for the DIPOLE function.
+c
+      real(r_typ) :: b0=1._r_typ
+c
+c ****** Parameters for the PFSS_BKG function.
+c
+      real(r_typ) :: mu
+      real(r_typ) :: rss
+c
+      end module
+c#######################################################################
       program MAPFL
 c
 c-----------------------------------------------------------------------
@@ -1027,6 +807,9 @@ c
       use field_line_params
       use step_size_stats
       use debug
+      use magfld_func_def
+      use magfld_func_index
+      use magfld_func_params
 c
 c-----------------------------------------------------------------------
 c
@@ -1036,12 +819,14 @@ c-----------------------------------------------------------------------
 c
       integer :: ierr,i
       real(r_typ) :: ch_map_r=1.0_r_typ
-      logical :: trace_fwd=.false.,trace_bwd=.false.
+      logical :: trace_fwd=.false.
+      logical :: trace_bwd=.false.
       logical :: compute_q_on_slice=.false.
       logical :: compute_ch_map=.false.
       logical :: compute_ch_map_3d=.false.
       logical :: compute_dips_map_3d=.false.
       character(256) :: errline=' '
+      integer arglen
 c
 c-----------------------------------------------------------------------
 c
@@ -1063,15 +848,23 @@ c
      &  ch_map_output_file, compute_ch_map_3d, ch_map_3d_output_file,
      &  write_traces_to_hdf, write_traces_root, write_traces_as_xyz,
      &  compute_dips_map_3d, dips_map_3d_output_file, ns_dips,
-     &  slogqffile,slogqbfile,integrate_along_fl,scalar_input_file
+     &  slogqffile,slogqbfile,integrate_along_fl,scalar_input_file,
+     &  verbose, function_index, b0, mu
 c
 c-----------------------------------------------------------------------
 c
-c ****** Set the parameters.
+c ****** Get input filename from command line.
 c
-      call set_parameters
+      if (command_argument_count().ge.1) then
+        call GET_COMMAND_ARGUMENT(1,length=arglen)
+        allocate(character(arglen) :: infile)
+        call GET_COMMAND_ARGUMENT(1,value=infile)
+      else
+        allocate(character(9):: infile)
+        infile='mapfl.in'
+      end if
 c
-      call ffopen (1,infile,'r',ierr)
+      call ffopen (8,infile,'r',ierr)
 c
       if (ierr.ne.0) then
         write (*,*)
@@ -1084,10 +877,10 @@ c
 c
 c ****** Read the input file.
 c
-      call ffopen (1,trim(infile),'r',ierr)
-      read(1,datum,iostat=ierr)
+      call ffopen (8,trim(infile),'r',ierr)
+      read(8,datum,iostat=ierr)
       if (ierr.ne.0) then
-        backspace (1)
+        backspace (8)
         read (1,fmt='(A)') errline
         write (*,*)
         write (*,*) '### ERROR reading input file:'
@@ -1102,9 +895,16 @@ c
       write (*,*) '### Input file contents:'
       write (*,*)
       write(*,datum)
-      close (1)
+      close (8)
 c
-      if (verbose) then
+c
+c ****** Write the NAMELIST parameter values to file.
+c
+      call ffopen (8,'mapfl_parameters_used.out','rw',ierr)
+      write (8,datum)
+      close (8)
+c
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### ',cname,' Version ',cvers,' of ',cdate,'.'
       end if
@@ -1113,7 +913,7 @@ c ****** Read the parameters that define the analytic magnetic
 c ****** field function, if requested.
 c
       if (use_analytic_function) then
-        call read_function_params
+        call process_function_params
       end if
 c
 c ****** Set the field line integration parameters.
@@ -1144,7 +944,7 @@ c
       b%lim0(1)=max(b%lim0(1),domain_r_min)
       b%lim1(1)=min(b%lim1(1),domain_r_max)
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Domain limits:'
         write (*,*) 'Lower boundary value: ',b%lim0(1)
@@ -1211,7 +1011,7 @@ c
         call get_dips_map_3d
       end if
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         stat_ds_avg=0.
         if (stat_n.ne.0) stat_ds_avg=stat_ds_sum/stat_n
         write (*,*)
@@ -1226,11 +1026,11 @@ c
 c
       end
 c#######################################################################
-      subroutine read_function_params
+      subroutine process_function_params
 c
 c-----------------------------------------------------------------------
 c
-c ****** Read in the parameters for the analytic magnetic field
+c ****** Process parameters for the analytic magnetic field
 c ****** function.
 c
 c-----------------------------------------------------------------------
@@ -1243,7 +1043,6 @@ c
       use field
       use magfld_func_def
       use magfld_func_index
-      use lcase_interface
 c
 c-----------------------------------------------------------------------
 c
@@ -1256,23 +1055,11 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Using an analytic magnetic field'//
      &              ' function.'
       end if
-c
-c ****** Read in the parameters (in NAMELIST format) for the
-c ****** analytic function.
-c
-      if (verbose) then
-        write (*,*) '### Reading the analytic field'//
-     &              ' function parameters ...'
-        write (*,*) '### Parameters file name: ',
-     &              trim(function_params_file)
-      end if
-c
-      call read_magfld_function_params (function_params_file)
 c
 c ****** Check that the requested function index is valid.
 c
@@ -1285,7 +1072,7 @@ c
         call exit (1)
       end if
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) '### Using the analytic magnetic field'//
      &              ' function with index = ',function_index
       end if
@@ -1341,50 +1128,6 @@ c
       return
       end
 c#######################################################################
-      subroutine read_magfld_function_params (fname)
-c
-c-----------------------------------------------------------------------
-c
-c ****** Read the NAMELIST parameters that define the magnetic
-c ****** field analytic function.
-c
-c-----------------------------------------------------------------------
-c
-      use magfld_func_namelist
-c
-c-----------------------------------------------------------------------
-c
-      implicit none
-c
-c-----------------------------------------------------------------------
-c
-      character(*) :: fname
-c
-c-----------------------------------------------------------------------
-c
-      integer :: ierr
-c
-c-----------------------------------------------------------------------
-c
-      call ffopen (1,fname,'r',ierr)
-c
-      if (ierr.ne.0) then
-        write (*,*)
-        write (*,*) '### ERROR in READ_MAGFLD_FUNCTION_PARAMS:'
-        write (*,*) '### Could not open the analytic field'//
-     &              ' function parameters file.'
-        write (*,*) 'File name: ',trim(fname)
-        call exit (1)
-      end if
-c
-c ****** Read the NAMELIST parameters.
-c
-      read (1,function_parameters)
-      close (1)
-c
-      return
-      end
-c#######################################################################
       subroutine readb (bfile,b)
 c
 c-----------------------------------------------------------------------
@@ -1418,7 +1161,7 @@ c ****** Read the magnetic field components.
 c
 c ****** Br.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Reading data file: ',trim(bfile%r)
       end if
@@ -1444,7 +1187,7 @@ c
 c
 c ****** Bt.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'Reading data file: ',trim(bfile%t)
       end if
 c
@@ -1469,7 +1212,7 @@ c
 c
 c ****** Bp.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'Reading data file: ',trim(bfile%p)
       end if
 c
@@ -1493,7 +1236,7 @@ c
       end if
 c
 c ****** Set the type of magnetic field files.
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'Setting btype.'
       end if
 c
@@ -1502,7 +1245,7 @@ c
 c ****** Build the inverse interpolation tables.
 c
 
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'Building inverse tables.'
       end if
 c
@@ -1515,7 +1258,7 @@ c ****** spline coefficients.
 c
       if (cubic) then
         b%cubic=.true.
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*)
           write (*,*) 'Computing cubic spline coefficients'//
      &                ' for Br ...'
@@ -1525,7 +1268,7 @@ c
      &                          b%r%scales(2)%f,
      &                          b%r%scales(3)%f,
      &                          b%r%f,b%spl%r)
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*)
           write (*,*) 'Computing cubic spline coefficients'//
      &                ' for Bt ...'
@@ -1535,7 +1278,7 @@ c
      &                          b%t%scales(2)%f,
      &                          b%t%scales(3)%f,
      &                          b%t%f,b%spl%t)
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*)
           write (*,*) 'Computing cubic spline coefficients'//
      &                ' for Bp ...'
@@ -1585,8 +1328,8 @@ c
 c
 c ****** The values of pi and 2*pi using 32-bit precision.
 c
-      real(KIND_REAL_4), parameter :: pi_r4=pi
-      real(KIND_REAL_4), parameter :: twopi_r4=twopi
+      real(REAL32), parameter :: pi_r4=pi
+      real(REAL32), parameter :: twopi_r4=twopi
 c
 c-----------------------------------------------------------------------
 c
@@ -1599,7 +1342,7 @@ c-----------------------------------------------------------------------
 c
 c ****** Check the type of magnetic field files read in.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'SET_BTYPE: Checking type of magnetic field files.'
       end if
 c
@@ -1612,7 +1355,7 @@ c
      &    b%r%dims(3).eq.b%t%dims(3)  .and.
      &    b%r%dims(3).eq.b%p%dims(3)-1) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write(*,*) 'SET_BTYPE: Detected new MAS code type.'
         end if
 c
@@ -1635,7 +1378,7 @@ c
      &         b%r%dims(3).eq.b%t%dims(3)  .and.
      &         b%r%dims(3).eq.b%p%dims(3)  ) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write(*,*) 'SET_BTYPE: Detected old MAS code type.'
         end if
 c
@@ -1651,7 +1394,7 @@ c ****** Do not add a phi point if the phi interval already includes
 c ****** the whole interval. Can occur if grid modified outside mapfl.
 c
         if (abs((b%ps(b%nps)-b%ps(1))-twopi).lt.eps) then
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*) 'SET_BTYPE: Phi already wrapped!'
           end if
           add_phi_point=.false.
@@ -1668,7 +1411,7 @@ c
      &         b%r%dims(3).eq.b%t%dims(3)  .and.
      &         b%r%dims(3).eq.b%p%dims(3)+1) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write(*,*) 'SET_BTYPE: Detected POT3D code type.'
         end if
 c
@@ -1691,7 +1434,7 @@ c
      &         b%r%dims(3).eq.b%t%dims(3)  .and.
      &         b%r%dims(3).eq.b%p%dims(3)-1) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write(*,*) 'SET_BTYPE: Detected new-old POT3D type.'
         end if
 c
@@ -1714,7 +1457,7 @@ c
      &         b%r%dims(3).eq.b%t%dims(3)  .and.
      &         b%r%dims(3).eq.b%p%dims(3)  ) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write(*,*) 'SET_BTYPE: Detected old POT3D code type.'
         end if
 c
@@ -1730,7 +1473,7 @@ c ****** Do not add a phi point if the phi interval already includes
 c ****** the whole interval. Can occur if grid modified outside mapfl.
 c
         if (abs((b%ps(b%nps)-b%ps(1))-twopi).lt.eps) then
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*) 'SET_BTYPE: Phi already wrapped!'
           end if
           add_phi_point=.false.
@@ -1747,7 +1490,7 @@ c
      &         b%r%dims(3).eq.b%t%dims(3).and.
      &         b%r%dims(3).eq.b%p%dims(3)) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write(*,*) 'SET_BTYPE: Detected non-staggered type.'
         end if
 c
@@ -1763,7 +1506,7 @@ c ****** Do not add a phi point if the phi interval already includes
 c ****** the whole interval. Can occur if grid modified outside mapfl.
 c
         if (abs((b%ps(b%nps)-b%ps(1))-twopi).lt.eps) then
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*) 'SET_BTYPE: Phi already wrapped!'
           end if
           add_phi_point=.false.
@@ -1790,7 +1533,7 @@ c ****** take care of periodic wrap-around.
 c
       if (add_phi_point) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*) 'SET_BTYPE: Adding phi point.'
         end if
 c
@@ -1847,7 +1590,7 @@ c
 c ****** Set the precision of the B that was read in, based
 c ****** on the type of the individual HDF files of the components.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'SET_BTYPE: Setting B precision.'
       end if
 c
@@ -1867,14 +1610,14 @@ c ****** and phi=2*pi boundaries will be more likely to end up
 c ****** inside the domain.
 c
       if (abs(b%ts(b%nts)-pi).lt.eps) then
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*) 'SET_BTYPE: Snapping t.'
         end if
         b%ts(b%nts)=pi+3._r_typ*spacing(pi_r4)
       end if
 c
       if (abs(b%ps(b%nps)-twopi).lt.eps) then
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*) 'SET_BTYPE: Snapping p.'
         end if
         b%ps(b%nps)=twopi+3._r_typ*spacing(twopi_r4)
@@ -1882,7 +1625,7 @@ c
 c
 c ****** Set the domain limits.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'SET_BTYPE: Set domain limits.'
       end if
 c
@@ -1896,7 +1639,7 @@ c
 c ****** Build the inverse interpolation tables for the
 c ****** main mesh.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'SET_BTYPE: Building inverse interpolation tables.'
       end if
 c
@@ -1914,7 +1657,7 @@ c
 c
 c ****** Compute the mesh cell dimensions on the main mesh.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'SET_BTYPE: Computing mesh cell dims.'
       end if
 c
@@ -2021,7 +1764,7 @@ c ****** Check if the mesh is to be read from a 1D HDF file.
 c
         if (mesh_file_r.ne.' ') then
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Reading the r mesh from file: ',
      &                  trim(mesh_file_r)
@@ -2056,7 +1799,7 @@ c
 c
           call deallocate_sds (s)
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Mesh read in for the r mesh:'
             write (*,*) 'Number of points = ',nrss
@@ -2084,7 +1827,7 @@ c
             r1=b%lim1(1)
           end if
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Generating a uniform r mesh:'
             write (*,*) 'Number of points = ',nrss
@@ -2125,7 +1868,7 @@ c ****** Check if the mesh is to be read from a 1D HDF file.
 c
         if (mesh_file_t.ne.' ') then
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Reading the t mesh from file: ',
      &                  trim(mesh_file_t)
@@ -2160,7 +1903,7 @@ c
 c
           call deallocate_sds (s)
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Mesh read in for the t mesh:'
             write (*,*) 'Number of points = ',ntss
@@ -2188,7 +1931,7 @@ c
             t1=b%lim1(2)
           end if
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Generating a uniform t mesh:'
             write (*,*) 'Number of points = ',ntss
@@ -2229,7 +1972,7 @@ c ****** Check if the mesh is to be read from a 1D HDF file.
 c
         if (mesh_file_p.ne.' ') then
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Reading the p mesh from file: ',
      &                  trim(mesh_file_p)
@@ -2264,7 +2007,7 @@ c
 c
           call deallocate_sds (s)
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Mesh read in for the p mesh:'
             write (*,*) 'Number of points = ',npss
@@ -2292,7 +2035,7 @@ c
             p1=b%lim1(3)
           end if
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             write (*,*)
             write (*,*) '### Generating a uniform p mesh:'
             write (*,*) 'Number of points = ',npss
@@ -2414,7 +2157,7 @@ c
       ds%min=ds%min*dsmult
       ds%max=ds%max*dsmult
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Field line integration parameters:'
         if (ds%variable) then
@@ -2514,12 +2257,12 @@ c ****** Trace field lines, starting from each (T,P) cell at r=R0,
 c ****** until the field line hits r=R1, or goes back to r=R0,
 c ****** or exhausts the field line length allowed.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing a forward mapping from R0:'
       end if
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Mapping field lines ...'
         write (*,*)
@@ -2544,7 +2287,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-          if (verbose) then
+          if (verbose.gt.0) then
 c$omp critical
             n_completed=n_completed+1
             nc=n_completed
@@ -2608,7 +2351,7 @@ c$omp end critical
 c
 c ****** Write progress diagnostics if requested.
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
               pct_done=100.*nc/n_total
@@ -2626,7 +2369,7 @@ c
       wrote_cr=.false.
 c
       if (rffile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -2647,7 +2390,7 @@ c
       end if
 c
       if (tffile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -2668,7 +2411,7 @@ c
       end if
 c
       if (pffile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -2689,7 +2432,7 @@ c
       end if
 c
       if (effile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -2710,7 +2453,7 @@ c
       end if
 c
       if (kffile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -2731,7 +2474,7 @@ c
       end if
 c
       if (lffile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -2827,7 +2570,7 @@ ccc$omp& schedule(dynamic,iterations_per_thread)
       enddo
 c
       if (qffile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -2850,7 +2593,7 @@ c
 c
         call slogq (qfl,slogqfl,b%lim0(1))
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*) 'Writing the forward mapping '//
      &                'SLOG(Q) to file: ',
      &                trim(slogqffile)
@@ -3019,12 +2762,12 @@ c ****** Trace field lines, starting from each (T,P) cell at r=R1,
 c ****** until the field line hits r=R0, or goes back to r=R1,
 c ****** or exhausts the number of segments allowed.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing a backward mapping from R1:'
       end if
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Mapping field lines ...'
         write (*,*)
@@ -3050,7 +2793,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-          if (verbose) then
+          if (verbose.gt.0) then
 c$omp critical (omp_nc)
             n_completed=n_completed+1
             nc=n_completed
@@ -3111,7 +2854,7 @@ c$omp end critical (nbad2)
 c
 c ****** Write progress diagnostics if requested.
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
               pct_done=100.*nc/n_total
@@ -3129,7 +2872,7 @@ c
       wrote_cr=.false.
 c
       if (rbfile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3150,7 +2893,7 @@ c
       end if
 c
       if (tbfile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3171,7 +2914,7 @@ c
       end if
 c
       if (pbfile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3192,7 +2935,7 @@ c
       end if
 c
       if (ebfile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3213,7 +2956,7 @@ c
       end if
 c
       if (kbfile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3234,7 +2977,7 @@ c
       end if
 c
       if (lbfile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3326,7 +3069,7 @@ c
       enddo
 c
       if (qbfile.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3349,7 +3092,7 @@ c
 c
         call slogq (qfl,slogqfl,b%lim1(1))
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*) 'Writing the backward mapping '//
      &                'SLOG(Q) to file: ',
      &                trim(slogqbfile)
@@ -3458,12 +3201,12 @@ c ****** Trace field lines, starting from each (R,T,P) cell,
 c ****** until the field line hits the boundaries or exhausts
 c ****** the field line length allowed.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing a mapping in 3D:'
       end if
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Mapping field lines ...'
         write (*,*)
@@ -3487,7 +3230,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
 c$omp critical
               n_completed=n_completed+1
               nc=n_completed
@@ -3510,7 +3253,7 @@ c
 c
 c ****** Write progress diagnostics if requested.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.*nc/n_total
@@ -3529,7 +3272,7 @@ c
       wrote_cr=.false.
 c
       if (volume3d_output_file%r.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3551,7 +3294,7 @@ c
       end if
 c
       if (volume3d_output_file%t.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3573,7 +3316,7 @@ c
       end if
 c
       if (volume3d_output_file%p.ne.' ') then
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -3638,14 +3381,14 @@ c
 c
 c ****** Read the coordinates of the slice.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Reading the coordinates of the slice ...'
       end if
 c
 c ****** Read the x/r coordinate file.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Reading the '//slice_coord_name(1)//
      &              ' coordinate from file: ',
@@ -3666,7 +3409,7 @@ c
 c
 c ****** Read the y/t coordinate file.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'Reading the '//slice_coord_name(2)//
      &              ' coordinate from file: ',
      &              trim(slice_input_file%t)
@@ -3703,7 +3446,7 @@ c
 c
 c ****** Read the z/p coordinate file.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*) 'Reading the '//slice_coord_name(3)//
      &              ' coordinate from file: ',
      &              trim(slice_input_file%p)
@@ -3875,7 +3618,7 @@ c-----------------------------------------------------------------------
 c
 c ****** Map the field lines for all points on a slice in 3D.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing a mapping starting on a slice:'
       end if
@@ -3903,7 +3646,7 @@ c
       ds_b=ds
       ds_b%direction=-1
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         if (trace_slice_direction_is_along_b) then
           write (*,*)
           write (*,*) '### The forward tracing direction is'//
@@ -3963,7 +3706,7 @@ c
         end if
       end if
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Mapping field lines ...'
         write (*,*)
@@ -3988,7 +3731,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
 c$omp critical
               n_completed=n_completed+1
               nc=n_completed
@@ -4076,7 +3819,7 @@ c
 c
 c ****** Write progress diagnostics if requested.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.*nc/n_total
@@ -4104,7 +3847,7 @@ c
         out%scales(2)%f=>slice_c1%scales(2)%f
         out%scales(3)%f=>slice_c1%scales(3)%f
         out%f=>rfl_f
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -4135,7 +3878,7 @@ c
         out%scales(2)%f=>slice_c2%scales(2)%f
         out%scales(3)%f=>slice_c2%scales(3)%f
         out%f=>tfl_f
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -4166,7 +3909,7 @@ c
         out%scales(2)%f=>slice_c3%scales(2)%f
         out%scales(3)%f=>slice_c3%scales(3)%f
         out%f=>pfl_f
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -4201,7 +3944,7 @@ c
         out%scales(2)%f=>slice_c1%scales(2)%f
         out%scales(3)%f=>slice_c1%scales(3)%f
         out%f=>rfl_b
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -4232,7 +3975,7 @@ c
         out%scales(2)%f=>slice_c2%scales(2)%f
         out%scales(3)%f=>slice_c2%scales(3)%f
         out%f=>tfl_b
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -4263,7 +4006,7 @@ c
         out%scales(2)%f=>slice_c3%scales(2)%f
         out%scales(3)%f=>slice_c3%scales(3)%f
         out%f=>pfl_b
-        if (verbose) then
+        if (verbose.gt.0) then
           if (.not.wrote_cr) then
             write (*,*)
             wrote_cr=.true.
@@ -4289,7 +4032,7 @@ c ****** files if requested.
 c
       if (write_traces_to_hdf.and.trace_from_slice_forward) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*)
         end if
 c
@@ -4322,14 +4065,14 @@ c
               write (ch4,'(i4.4)') n
               fname=trim(write_traces_root)//'_f_'//ch4//'.'//trim(fmt)
 c
-              if (verbose) then
+              if (verbose.gt.0) then
                 write (*,*) 'Writing a forward field line trace'//
      &                      ' to file: ',trim(fname)
               end if
 c
               call wrhdf_2d (fname,.false.,
      &                       3,xtf(i,j,k)%npts,fl,
-     &                       dummy,dummy,
+     &                       fl(:,1),fl(1,:),
      &                       slice_c1%hdf32,ierr)
 c
               if (ierr.ne.0) then
@@ -4358,7 +4101,7 @@ c ****** files if requested.
 c
       if (write_traces_to_hdf.and.trace_from_slice_backward) then
 c
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*)
         end if
 c
@@ -4391,14 +4134,14 @@ c
               write (ch4,'(i4.4)') n
               fname=trim(write_traces_root)//'_b_'//ch4//'.'//trim(fmt)
 c
-              if (verbose) then
+              if (verbose.gt.0) then
                 write (*,*) 'Writing a backward field line trace'//
      &                      ' to file: ',trim(fname)
               end if
 c
               call wrhdf_2d (fname,.false.,
      &                       3,xtb(i,j,k)%npts,fl,
-     &                       dummy,dummy,
+     &                       fl(:,1),fl(1,:),
      &                       slice_c1%hdf32,ierr)
 c
               if (ierr.ne.0) then
@@ -4496,7 +4239,7 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing a coronal hole map at r = ',rv
       end if
@@ -4536,7 +4279,7 @@ c
       ds_b=ds
       ds_b%direction=-1
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Mapping field lines ...'
         write (*,*)
@@ -4560,7 +4303,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-          if (verbose) then
+          if (verbose.gt.0) then
 c$omp critical
             n_completed=n_completed+1
             nc=n_completed
@@ -4642,7 +4385,7 @@ c
 c
 c ****** Write progress diagnostics if requested.
 c
-          if (verbose) then
+          if (verbose.gt.0) then
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
               pct_done=100.*nc/n_total
@@ -4657,7 +4400,7 @@ c$omp end parallel do
 c
 c ****** Write the coronal hole map.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Writing the coronal hole map to file: ',
      &              trim(ch_map_output_file)
@@ -4730,7 +4473,7 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing a 3D coronal hole map:'
       end if
@@ -4757,7 +4500,7 @@ c
       ds_b=ds
       ds_b%direction=-1
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Mapping field lines ...'
         write (*,*)
@@ -4782,7 +4525,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
 c$omp critical
               n_completed=n_completed+1
               nc=n_completed
@@ -4864,7 +4607,7 @@ c
 c
 c ****** Write progress diagnostics if requested.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.*nc/n_total
@@ -4880,7 +4623,7 @@ c$omp end parallel do
 c
 c ****** Write the coronal hole map.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Writing the 3D coronal hole map to file: ',
      &              trim(ch_map_3d_output_file)
@@ -4947,7 +4690,7 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing Q on a slice:'
       end if
@@ -4976,7 +4719,7 @@ c
         allocate (length(n1,n2,n3))
       end if
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Getting Q ...'
         write (*,*)
@@ -5008,7 +4751,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
 c$omp critical
               n_completed=n_completed+1
               nc=n_completed
@@ -5040,7 +4783,7 @@ c
 c
 c ****** Write progress diagnostics if requested.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.*nc/n_total
@@ -5054,7 +4797,7 @@ c
       enddo
 c$omp end parallel do
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
       end if
 c
@@ -5069,7 +4812,7 @@ c
         out%scales(2)%f=>slice_c1%scales(2)%f
         out%scales(3)%f=>slice_c1%scales(3)%f
         out%f=>qfl
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*) 'Writing Q in the slice to file: ',
      &                trim(slice_q_output_file)
         end if
@@ -5096,7 +4839,7 @@ c
         out%scales(2)%f=>slice_c1%scales(2)%f
         out%scales(3)%f=>slice_c1%scales(3)%f
         out%f=>length
-        if (verbose) then
+        if (verbose.gt.0) then
           write (*,*) 'Writing field line length in'//
      &                ' the slice to file: ',
      &                trim(slice_length_output_file)
@@ -6138,7 +5881,7 @@ c
 c-----------------------------------------------------------------------
 c
       logical :: store_trace
-      real(r_typ) :: ds0,dss,dsss,frac,dsmult_corrector 
+      real(r_typ) :: ds0,dss,dsss,frac,dsmult_corrector
       real(r_typ) :: sf=1._r_typ,sf1,sf2
       logical :: done_tracing,first,nullb
       integer :: idir0,n,ntry,max_n,max_ntry
@@ -6178,7 +5921,7 @@ c
       max_n=floor(ds%lmax/ds%min)
       max_ntry=ds%short_fl_max_tries
 c
-      if (gather_stats) then
+      if (gather_stats.gt.0) then
         local_stat_n=0
         local_stat_ds_sum=0.
         local_stat_ds_min=huge(one)
@@ -6312,7 +6055,7 @@ c
 c
 c ****** Gather step size statistics.
 c
-          if (gather_stats) then
+          if (gather_stats.gt.0) then
             local_stat_n=local_stat_n+1
             local_stat_ds_sum=local_stat_ds_sum+abs(ds0)
             local_stat_ds_min=min(local_stat_ds_min,abs(ds0))
@@ -6657,7 +6400,7 @@ c
 c
 c ****** Update the step size statistics.
 c
-      if (gather_stats) then
+      if (gather_stats.gt.0) then
 c$omp critical (omp_stat)
         stat_n=stat_n+local_stat_n
         stat_ds_sum=stat_ds_sum+local_stat_ds_sum
@@ -7534,7 +7277,7 @@ c
         xs(1)=x%s(1)
         xs(2)=x%s(2)
         xs(3)=pv
-        call magnetic_field_function (0.,.true.,xs,bv%s)
+        call magnetic_field_function (0._r_typ,.true.,xs,bv%s)
         go to 100
       end if
 c
@@ -8103,100 +7846,6 @@ c
 c
       return
       end
-c#######################################################################
-      subroutine set_parameters
-c
-c-----------------------------------------------------------------------
-c
-c ****** Set parameters from the command line arguments.
-c
-c-----------------------------------------------------------------------
-c
-      use ident
-      use number_types
-      use syntax
-      use paragraph_def
-      use get_usage_line_interface
-      use print_par_interface
-      use delete_par_interface
-      use params
-c
-c-----------------------------------------------------------------------
-c
-      implicit none
-c
-c-----------------------------------------------------------------------
-c
-c ****** Storage the for usage line.
-c
-      type(paragraph), pointer :: usage
-c
-c ****** Storage for the error message.
-c
-      character(72) :: errmsg
-c
-c-----------------------------------------------------------------------
-c
-      integer :: ierr
-      character(256) :: arg
-      logical :: set
-c
-c-----------------------------------------------------------------------
-c
-c ****** Define the syntax.
-c
-      call defarg (GROUP_K ,'-v',' ',' ')
-      call defarg (GROUP_A ,'infile',' ',' ')
-c
-c ****** Parse the command line.
-c
-      call parse (errmsg,ierr)
-c
-      if (ierr.ne.0) then
-c
-        write (*,*)
-        write (*,*) '### ',cname,' Version ',cvers,' of ',cdate,'.'
-        write (*,*) '### Calculate the field line mapping'//
-     &              ' for MAS code runs.'
-c
-        if (ierr.gt.1) then
-          write (*,*)
-          write (*,*) errmsg
-        end if
-c
-c ****** Print the usage line.
-c
-        call get_usage_line (usage)
-c
-        write (*,*)
-        write (*,*) 'Usage:'
-        write (*,*)
-c
-        call print_par (usage)
-c
-        write (*,*)
-        write (*,*) 'Read the parameters from input file <infile>.'
-        call delete_par (usage)
-c
-        call exit (1)
-c
-      end if
-c
-c ****** Set the parameters.
-c
-c ****** Verbose flag.
-c
-      call fetcharg ('-v',set,arg)
-      verbose=set
-c
-c ****** Input file name.
-c
-      call fetcharg ('infile',set,arg)
-      infile=trim(arg)
-c
-      return
-      end
-c#######################################################################
 c#######################################################################
       subroutine compute_spline_1d (nx,x,f,s)
 c
@@ -10228,7 +9877,7 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) '### Computing a 3D dips map:'
       end if
@@ -10245,7 +9894,7 @@ c
       end if
 
 
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Mapping field lines ...'
         write (*,*)
@@ -10267,7 +9916,7 @@ c
 c ****** Update the iteration counter for diagnostic
 c ****** purposes.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
 c$omp critical
               n_completed=n_completed+1
               nc=n_completed
@@ -10283,7 +9932,7 @@ c
 c
 c ****** Write progress diagnostics if requested.
 c
-            if (verbose) then
+            if (verbose.gt.0) then
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.*nc/n_total
@@ -10300,7 +9949,7 @@ c$omp end parallel do
 c
 c ****** Write the coronal hole map.
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Writing the 3D coronal hole map to file: ',
      &              trim(dips_map_3d_output_file)
@@ -10446,12 +10095,12 @@ c
       return
       end
 c#######################################################################
-      subroutine set_up_integration 
+      subroutine set_up_integration
 c
 c-----------------------------------------------------------------------
 c
 c ****** Set up integration along field lines.
-c ****** Read scalar field. 
+c ****** Read scalar field.
 c
 c-----------------------------------------------------------------------
 c
@@ -10475,7 +10124,7 @@ c
 c
 c ****** Read the scalar field
 c
-      if (verbose) then
+      if (verbose.gt.0) then
         write (*,*)
         write (*,*) 'Reading data file: ',trim(scalar_input_file)
       end if
@@ -10503,3 +10152,516 @@ c
 c
       return
       end
+c#######################################################################
+      subroutine magnetic_field_function (time,rtp,s,v)
+c
+c-----------------------------------------------------------------------
+c
+c ****** Analytic magnetic field function.
+c
+c-----------------------------------------------------------------------
+c
+      use number_types
+      use magfld_func_def
+      use magfld_func_index
+      use magfld_func_params
+c
+c-----------------------------------------------------------------------
+c
+      implicit none
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: time
+      logical :: rtp
+      real(r_typ), dimension(3) :: s
+      real(r_typ), dimension(3) :: v
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ), parameter :: two=2._r_typ
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: x,y,z
+      real(r_typ) :: r,t,p
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ), external :: br_pfss_bkg
+      real(r_typ), external :: bt_pfss_bkg
+      real(r_typ), external :: bp_pfss_bkg
+c
+c-----------------------------------------------------------------------
+c
+      if (rtp) then
+        r=s(1)
+        t=s(2)
+        p=s(3)
+      else
+        x=s(1)
+        y=s(2)
+        z=s(3)
+      end if
+c
+      select case (function_index)
+      case (FUNC_TYPE_DIPOLE)
+        v(1)=two*b0*cos(t)/r**3
+        v(2)=b0*sin(t)/r**3
+        v(3)=0.
+      case (FUNC_TYPE_PFSS_BKG)
+        v(1)=br_pfss_bkg(r,t,p,mu,rss)
+        v(2)=bt_pfss_bkg(r,t,p,mu,rss)
+        v(3)=bp_pfss_bkg(r,t,p,mu,rss)
+      case default
+        write (*,*)
+        write (*,*) '### ERROR in MAGNETIC_FIELD_FUNCTION:'
+        write (*,*) '### Invalid function requested:'
+        write (*,*) 'FUNCTION_INDEX = ',function_index
+        call exit (1)
+      end select
+c
+      return
+      end
+c#######################################################################
+      function br_pfss_bkg (r, theta, phi, mu, Rss)
+c
+c-----------------------------------------------------------------------
+c
+      use number_types
+c
+c-----------------------------------------------------------------------
+c
+      implicit none
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: r
+      real(r_typ) :: theta
+      real(r_typ) :: phi
+      real(r_typ) :: mu
+      real(r_typ) :: Rss
+      real(r_typ) :: br_pfss_bkg
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: t1
+      real(r_typ) :: t4
+      real(r_typ) :: t10
+c
+c-----------------------------------------------------------------------
+c
+      t1 = Rss ** 2
+      t4 = r ** 2
+      t10 = cos(theta)
+      br_pfss_bkg = (0.1D1 / t1 / Rss + 0.2D1 / t4 / r) * mu * t10
+c
+      return
+      end
+c#######################################################################
+      function bt_pfss_bkg (r, theta, phi, mu, Rss)
+c
+c-----------------------------------------------------------------------
+c
+      use number_types
+c
+c-----------------------------------------------------------------------
+c
+      implicit none
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: r
+      real(r_typ) :: theta
+      real(r_typ) :: phi
+      real(r_typ) :: mu
+      real(r_typ) :: Rss
+      real(r_typ) :: bt_pfss_bkg
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: t1
+      real(r_typ) :: t4
+      real(r_typ) :: t9
+c
+c-----------------------------------------------------------------------
+c
+      t1 = Rss ** 2
+      t4 = r ** 2
+      t9 = sin(theta)
+      bt_pfss_bkg = (-0.1D1 / t1 / Rss + 0.1D1 / t4 / r) * mu * t9
+c
+      return
+      end
+c#######################################################################
+      function bp_pfss_bkg (r, theta, phi, mu, Rss)
+c
+c-----------------------------------------------------------------------
+c
+      use number_types
+c
+c-----------------------------------------------------------------------
+c
+      implicit none
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: r
+      real(r_typ) :: theta
+      real(r_typ) :: phi
+      real(r_typ) :: mu
+      real(r_typ) :: Rss
+      real(r_typ) :: bp_pfss_bkg
+c
+c-----------------------------------------------------------------------
+c
+      bp_pfss_bkg=0.
+c
+      return
+      end
+c#######################################################################
+c
+c Changelog:
+c
+c        08/30/2005, ZM, Version 1.06:
+c
+c         - Converted MAPFL v1.05 into a tool.
+c         - Improved the tracing accuracy of short field lines
+c           (e.g., those near the neutral line).
+c         - Improved the field line integrator.
+c         - Added the ability to perform a 3D mapping of the
+c           field lines.
+c
+c        06/16/2006, ZM, Version 1.07:
+c
+c         - Fixed the effect of rondoff errors in generating the
+c           meshes for the calculation which caused initial points
+c           to lie outside the computation domain.
+c
+c        06/21/2006, ZM, Version 1.08:
+c
+c         - Allowed the ability of specifying planes for the
+c           field line mapping region and the 3D mapping.
+c           This extends the capability of the tool to get
+c           Q on 2D slices.
+c
+c        07/07/2006, ZM, Version 1.09:
+c
+c         - Added the ability to do new POT3D files,
+c           new-old POT3D files, and old POT3D files.
+c
+c        08/22/2006, ZM, Version 1.10:
+c
+c         - Corrected a bug in the computation of Q for field
+c           lines that wrap periodically at the join between
+c           phi=0 and phi=2*pi.
+c         - Corrected the computation of Q on open field lines
+c           to take into account the difference in the radii
+c           of the initial and final field line footpoints.
+c         - Added the ability to use cubic spline interpolation.
+c           This increases the storage requirements substantially,
+c           and makes the computation significantly slower.
+c
+c        09/17/2006, ZM, Version 1.11:
+c
+c         - Reverted to the Cartesian field line integrator.
+c           The accuracy of the spherical integrator was being
+c           cast into doubt, though it was not proven to be
+c           bad.
+c         - Improved the accuracy with which the final point
+c           (i.e., the end point at the r boundaries) was
+c           being clipped to the boundary.
+c         - Changed the computation of Q to be staggered with
+c           respect to the mapping quantities.
+c         - Fixed the backward mapping routine to compute Q.
+c
+c        09/29/2006, ZM, Version 1.12:
+c
+c         - Improved the field line integrator to use a variable
+c           step size.  It is now possible to select either a uniform
+c           step size for the field line integration, as before,
+c           or to use a variable step size based on the local radius
+c           of curvature of the field line, and the local mesh size
+c           of the B files along the field line trace.
+c         - This has changed the format of the input file.
+c
+c        01/28/2007, ZM, Version 1.13:
+c
+c         - Added the ability to compute the mapping on 2D slices
+c           through the 3D volume.
+c         - This has changed the format of the input file.
+c         - Cleaned up some formatting of the output.
+c
+c        02/19/2008, ZM, Version 1.14:
+c
+c         - Changed the default behavior that terminated the code
+c           when more than 100 bad field line traces were found.
+c           By default this is now disabled, but can be put back
+c           by setting the variable MAX_BAD_FIELDLINES.
+c
+c        04/06/2009, ZM, Version 1.15:
+c
+c         - Added the ability to use an analytic function to define
+c           the magnetic field.
+c         - Corrected bugs involving how the expansion factor and Q
+c           were computed for the backward trace.
+c         - Performed a cosmetic clean-up of the code.
+c
+c        04/21/2009, ZM, Version 1.16:
+c
+c         - Added the ability to use Slava's new formulation
+c           to compute Q directly on slices within the domain
+c           by tracing a bundle of field lines from points in
+c           the domain forward and backward to the boundaries.
+c         - Cleaned up the way mapping along "slices" in the 3D
+c           volume is implemented.  These "slices" can now be
+c           lines (i.e., 1D files), 2D slices, or 3D volumes.
+c           These are all defined by reading in rectilinear
+c           files (1D, 2D, or 3D) that contain the (r,t,p) or
+c           (x,y,z) starting coordinates for the mapping.
+c         - Added a check to make sure that the input file
+c           has the correct number of lines.
+c
+c        02/18/2010, ZM, Version 1.17:
+c
+c         - Made the ability to trace from a slice more flexible.
+c           It is now possible to map from a slice along the
+c           forward and backward directions separately.  It is
+c           also possible to specify this direction to be either
+c           along B or along the direction of increasing radius.
+c         - Added the ability to directly compute coronal hole
+c           maps at a given radius.  These are coded by magnetic
+c           field polarity.
+c
+c        04/12/2010, ZM, Version 1.18:
+c
+c         - Added the ability of specifying the r, t, and p meshes
+c           to be used for the calculation.  These can be specified
+c           as 1D HDF files or as uniform meshes.
+c         - Allowed the phi coordinate to be outside the [0,2*pi]
+c           range in the input file.  It is now properly wrapped
+c           into the main interval during the calculation.
+c
+c        04/26/2010, ZM, Version 1.19:
+c
+c         - Added the ability to compute 3D coronal hole maps.
+c           These are useful to compute 3D open/closed field regions
+c           for use, perhaps, in developing heating masks.
+c         - Removed the writing of warning messages about field
+c           lines that did not reach the boundaries in the coronal
+c           hole map traces.  This was not really necessary since
+c           such field lines are already flagged (with values of
+c           "-2") in the coronal hole maps.
+c
+c        02/07/2011, ZM, Version 1.20:
+c
+c         - Added a multi-threading capability using OpenMP.
+c           This version runs in parallel.  This required a
+c           restructuring of the code to improve the modularity,
+c           to make the code thread-safe, and to improve the
+c           parallel performance.
+c         - It is necessary to use "thread-safe" programming
+c           in the parallel sections from now on.
+c
+c        05/18/2011, ZM, Version 1.21:
+c
+c         - Corrected a bug in the periodic wrapping of the phi
+c           coordinate when it was outside the range [0,2*pi].
+c           It was not being wrapped to the main periodic interval
+c           in the GETB routine.
+c
+c        08/17/2012, ZM, Version 1.22:
+c
+c         - Fixed a minor bug that was discovered by compiling
+c           with GFORTRAN.
+c
+c        04/29/2013, ZM, Version 1.23:
+c
+c         - Changed the interpretation of the value of DEBUG_LEVEL
+c           for debugging output.  This was done to optimize
+c           Slava's output of field line traces.  The functionality
+c           of the program was not otherwise modified.
+c
+c        05/13/2013, ZM, Version 1.24:
+c
+c         - Added the ability to write field line traces to HDF
+c           files.  This option can be selected when tracing from
+c           a "slice".  It is not intended to be used when doing
+c           very high resolution mapping computations, since it
+c           can produce a large amount of data.  To get the HDF
+c           files, set DEBUG_LEVEL.ge.2.  The field lines traces
+c           for the forward and/or backward trace will be written
+c           to HDF files named:
+c
+c             field_line_traces_forward_rtp.hdf
+c             field_line_traces_forward_xyz.hdf
+c             field_line_traces_backward_rtp.hdf
+c             field_line_traces_backward_xyz.hdf
+c
+c        09/25/2015, ZM, Version 1.25:
+c
+c         - Changed the way short field lines are treated.
+c           Because of strange behavior noticed by Slava in a
+c           certain case, I changed the way the step size for
+c           "short" field lines was controlled.  It turned out
+c           that a "short" field line could become a very long
+c           field line when retraced!  Previously, these field
+c           lines were retraced with the miniumum step size, which
+c           led to a very long field line with lots of points.
+c           I relaxed this requirement on the step size once the
+c           number of points in the retraced field line exceeded
+c           the minimum number of points.
+c
+c        01/20/2016, RC, Version 1.26:
+c
+c         - Modified tracefl() routine to eliminate the use of "goto"s.
+c         - Minor speed improvements (~3%).
+c         - Manually added spline library into code to allow
+c           for the development of future optimizations.
+c
+c        02/09/2016, ZM, Version 1.26ZM:
+c
+c         - Fixed the check that adds a phi point to the B arrays
+c           for cases when all the B components are on the same
+c           mesh.  The code now checks if the point at phi=2*pi is
+c           already present, and only adds a point if it is not.
+c         - Fixed the storage of field line traces in the field line
+c           buffers.  Previously, when "short" field lines were
+c           detected, the buffers were not reinitialized when these
+c           short field lines were retraced with a smaller step size,
+c           leading to incorrect saved field line traces.
+c         - Fixed the computation of Q on slices for field line
+c           footpoints that approach the poles in routine GETQ.
+c           The previous differencing was not accurate for field
+c           line footpoints near the poles.  The new scheme switches
+c           to Cartesian basis vectors in a small neighborhood of
+c           the poles.
+c
+c        03/25/2016, ZM, Version 1.27ZM:
+c
+c         - Added code to snap the theta and phi limits of the B
+c           meshes to the correct values.  Previously, these could
+c           be slightly off due to the precision limitations of
+c           32-bit HDF files, leading to possible errors in the
+c           tracing of a (very small) subset of field lines.
+c
+c        04/19/2016, ZM, Version 1.28ZM:
+c
+c         - Added the ability to write the field line length when
+c           mapping forward/backward, and also when computing
+c           Q on a slice.
+c         - Added the ability to write traces of field lines traced
+c           from a slice to individual HDF output files.  These are
+c           named:
+c
+c              <root>_f_####.hdf
+c              <root>_b_####.hdf
+c
+c           where <root> is a string specified in the input file,
+c           and #### is a four-digit sequence number (0001, 0002,
+c           etc.).  The "f" and "b" labels designate forward/backward
+c           traces, as requested in the input file.  There is a flag
+c           in the input file to select whether Cartesian (x,y,z)
+c           coordinates or spherical (r,t,p) coordinates are
+c           written.
+c         - Removed the ability to write field lines to a single HDF
+c           file when the debug level was set to 2.  This is
+c           superseded by the new capability to write the traces to
+c           individual HDF files.
+c         - COMPTIBILITY CHANGE:  The changes in this version have
+c           modified the format
+c           of the input file, so unfortunately this version is
+c           not backward compatible.
+c
+c        01/17/2018, ZM, Version 1.29ZM:
+c
+c         - Changed the way the domain limits are set from the
+c           scales in the magnetic field files.  This is an attempt
+c           to make sure that roundoff does not cause points that
+c           are near theta=pi and phi=2*pi to end up outside the
+c           domain.
+c
+c        01/18/2018, RC, Version 1.30:
+c
+c         - Merged in 1.26ZM, 1.27ZM, 1.28ZM, and 1.29ZM changes.
+c         - Removed the small speed improvement from 1.26 for
+c           consistency reasons.
+c
+c        03/19/2018, RC, Version 1.31:
+c
+c         - Small change to allow HDF5 trace output files if
+c           input b files are HDF5.
+c
+c        05/10/2018, RC, Version 1.32:
+c
+c         - Added OpenMP to 3D cubic spline coef calculation.
+c
+c        05/20/2019, RL, Version 1.33:
+c
+c         - Added 3D dips map.
+c
+c        06/28/2019, RL, Version 2.00:
+c
+c         - COMPATIBILITY CHANGE!!!!
+c           Replaced formatted input file with namelist!
+c
+c        07/01/2019, RC, Version 2.01:
+c
+c         - Added option to output Slava's signed-log10
+c           of Q for forward and backward traces. To use, set
+c           SLOGQFFILE and/or SLOGQBFILE to desired output filenames.
+c         - Set default values for all namelist parameters and updated
+c           mapfl.dat to reflect the default values.
+c         - Added error-checking for namelist.
+c
+c        07/11/2019, RC, Version 2.02:
+c
+c         - Fixed bug in writing out backward mapping slogq.
+c
+c        07/12/2019, RC, Version 2.03:
+c
+c         - Fixed bug in writing out backward mapping slogq (again).
+c
+c        08/19/2019, RL, Version 2.04:
+c
+c         - Introduced capability to integrate scalar field along
+c           field lines.
+c           Speficy INTEGRATE_ALONG_FL=.true. and the name of the
+c           file with the field in SCALAR_INPUT_FILE
+c           Either TRACE_FWD, or TRACE_BWD, or TRACE_SLICE and
+c           COMPUTE_Q_ON_SLICE, must be set true.
+c           Specify the file with integrated quantity in LFFILE
+c           (for TRACE_FWD or TRACE_BWD true) or in
+c           SLICE_LENGTH_OUTPUT_FILE (for TRACE_SLICE and
+c           COMPUTE_Q_ON_SLICE true).
+c
+c        03/02/2021, AP,CD Version 2.0.5:
+c
+c         - Small modifications for Python/f2py cross compilation.
+c         - Debug statements in mesh detection, tweak to OLD MAS check.
+c         - Changed version numbering to standard style.
+c
+c        05/10/2022, EM,CD Version 2.0.6:
+c
+c         - Changed logic for slice mapping. If compute_q_on_slice
+c           is true, then the direct mapping will also be done after.
+c         - This makes it easier to get everything at once.
+c
+c        04/16/2024, RC Version 2.1.0:
+c
+c         - Moved changelog to bottom fo code.
+c         - Changed verbose to a namelist parameter and an integer
+c           (set greater than 0 to activate).
+c         - Changed stats variable to an integer to match verbose.
+c         - Changed command line.  Now, use as: mapfl INFILE
+c           If INFILE is not supplied, it defaults to "mapfl.in".
+c         - Added number_types module.
+c         - Integrated analytic magnetic field modules and routines
+c           into main code and namelist.
+c           Note that "rss" is no longer a parameter for the feature
+c           (it was not being used anyways).
+c         - Updated intents and dummy variables to avoid
+c           argument type mismatches.
+c
+c-----------------------------------------------------------------------
+c

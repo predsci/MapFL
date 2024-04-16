@@ -1,7 +1,7 @@
 !#######################################################################
 ! ****** PSI I/O: PSI I/O Tools.
 !
-!     Authors:  PSI
+!     Authors:  Predictive Science Inc.
 !
 !     Predictive Science Inc.
 !     www.predsci.com
@@ -62,7 +62,7 @@ module sds_def
 !
 end module
 !#######################################################################
-!subroutine ffopen (iun,fname,mode,ierr)
+subroutine ffopen (iun,fname,mode,ierr)
 !
 !-----------------------------------------------------------------------
 !
@@ -80,55 +80,55 @@ end module
 !
 !-----------------------------------------------------------------------
 !
-!      implicit none
+      implicit none
 !
 !-----------------------------------------------------------------------
 !
-!      integer :: iun
-!      character(*) :: fname
-!      character(*) :: mode
-!      integer :: ierr
-!      logical :: ex
+      integer :: iun
+      character(*) :: fname
+      character(*) :: mode
+      integer :: ierr
+      logical :: ex
 !
 !-----------------------------------------------------------------------
 !
-!      ierr=0
+      ierr=0
 !
-!      if (mode.eq.'r') then
-!        open (iun,file=fname,form="FORMATTED",status='old',err=900)
-!      else if (mode.eq.'rw') then
-!        open (iun,file=fname,form="FORMATTED",status='replace',err=900)
-!      else if (mode.eq.'w') then
-!        open (iun,file=fname,form="FORMATTED",status='new',err=900)
-!      elseif (mode.eq.'a') then
-!        inquire(file=fname, exist=ex)
-!        if (ex) then
-!          open (iun,file=fname,form="FORMATTED",position='append',err=900)
-!        else
-!          open (iun,file=fname,form="FORMATTED",status='new',err=900)
-!        end if
-!      else
-!        write (*,*)
-!        write (*,*) '### ERROR in FFOPEN:'
-!        write (*,*) '### Invalid MODE requested.'
-!        write (*,*) 'MODE = ',mode
-!        write (*,*) 'File name: ',trim(fname)
-!        ierr=2
-!        return
-!      end if
+      if (mode.eq.'r') then
+        open (iun,file=fname,form="FORMATTED",status='old',err=900)
+      else if (mode.eq.'rw') then
+        open (iun,file=fname,form="FORMATTED",status='replace',err=900)
+      else if (mode.eq.'w') then
+        open (iun,file=fname,form="FORMATTED",status='new',err=900)
+      elseif (mode.eq.'a') then
+        inquire(file=fname, exist=ex)
+        if (ex) then
+          open (iun,file=fname,form="FORMATTED",position='append',err=900)
+        else
+          open (iun,file=fname,form="FORMATTED",status='new',err=900)
+        end if
+      else
+        write (*,*)
+        write (*,*) '### ERROR in FFOPEN:'
+        write (*,*) '### Invalid MODE requested.'
+        write (*,*) 'MODE = ',mode
+        write (*,*) 'File name: ',trim(fname)
+        ierr=2
+        return
+      end if
 !
-!      return
+      return
 !
-!  900 continue
+  900 continue
 !
-!      write (*,*)
-!      write (*,*) '### ERROR in FFOPEN:'
-!      write (*,*) '### Error while opening the requested file.'
-!      write (*,*) 'File name: ',trim(fname)
-!      write (*,*) 'MODE = ',mode
-!      ierr=1
+      write (*,*)
+      write (*,*) '### ERROR in FFOPEN:'
+      write (*,*) '### Error while opening the requested file.'
+      write (*,*) 'File name: ',trim(fname)
+      write (*,*) 'MODE = ',mode
+      ierr=1
 !
-!end subroutine
+end subroutine
 !#######################################################################
 subroutine rdhdf (fname,s,ierr)
 !

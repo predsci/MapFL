@@ -167,6 +167,11 @@
   integrate_along_fl=.false.
 !File name for scalar field to be integrated along field lines  
   scalar_input_file=' '
+!Analytic magentic field parameters 
+!(used to be in magfield_function_params.dat)
+  function_index=2
+  b0=1.
+  mu=1.
 /
 ! These represent the default values of parameters in MAPFL.
 ! This file should be updated to reflect any changes to MAPFL in the future.
