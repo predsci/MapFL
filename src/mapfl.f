@@ -10135,7 +10135,7 @@ c
         write (*,*)
         write (*,*) '### ERROR in SET_UP_INTEGRATION:'
         write (*,*) '### Could not read scalar field.'
-        write (*,*) 'IERR (from RDHDF_3D) = ',ierr
+        write (*,*) 'IERR (from RDHDF) = ',ierr
         write (*,*) 'File name: ',trim(scalar_input_file)
         call exit (1)
       end if

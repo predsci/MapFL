@@ -62,6 +62,57 @@ module sds_def
 !
 end module
 !#######################################################################
+module rdhdf_1d_interface
+      interface
+        subroutine rdhdf_1d (fname,scale,nx,f,x,ierr)
+        use iso_fortran_env
+        implicit none
+        character(*) :: fname
+        logical :: scale
+        integer :: nx
+        real(REAL64), dimension(:), pointer :: f
+        real(REAL64), dimension(:), pointer :: x
+        integer :: ierr
+        intent(in) :: fname
+        intent(out) :: scale,nx,ierr
+        end subroutine
+      end interface
+end module
+!#######################################################################
+module rdhdf_2d_interface
+      interface
+        subroutine rdhdf_2d (fname,scale,nx,ny,f,x,y,ierr)
+        use iso_fortran_env
+        implicit none
+        character(*) :: fname
+        logical :: scale
+        integer :: nx,ny
+        real(REAL64), dimension(:,:), pointer :: f
+        real(REAL64), dimension(:), pointer :: x,y
+        integer :: ierr
+        intent(in) :: fname
+        intent(out) :: scale,nx,ny,ierr
+        end subroutine
+      end interface
+end module
+!#######################################################################
+module rdhdf_3d_interface
+      interface
+        subroutine rdhdf_3d (fname,scale,nx,ny,nz,f,x,y,z,ierr)
+        use iso_fortran_env
+        implicit none
+        character(*) :: fname
+        logical :: scale
+        integer :: nx,ny,nz
+        real(REAL64), dimension(:,:,:), pointer :: f
+        real(REAL64), dimension(:), pointer :: x,y,z
+        integer :: ierr
+        intent(in) :: fname
+        intent(out) :: scale,nx,ny,nz,ierr
+        end subroutine
+      end interface
+end module
+!#######################################################################
 subroutine ffopen (iun,fname,mode,ierr)
 !
 !-----------------------------------------------------------------------
@@ -669,7 +720,7 @@ subroutine wrhdf (fname,s,ierr)
       if (fname(i+1:i+2).eq.'h5') then
         call wrh5 (fname,s,ierr)
       else
-        print*,"HDF4 disabled."
+        print*,"HDF4 has been disabled."
         ierr=-1
       end if
 !
