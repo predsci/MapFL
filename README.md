@@ -1,10 +1,9 @@
+<img width=500 src="mapfl_logo.png" alt="MapFL" />  
   
-```
- __  __      _      ____    _____   _
-|  \/  |    / \    |  _ \  |  ___| | |  
-| |\/| |   / _ \   | |_) | | |_    | |    
-| |  | |  / ___ \  |  __/  |  _|   | |___  
-|_|  |_| /_/   \_\ |_|     |_|     |_____|
-```  
+# MapFL: Map Field Lines  
+
+[Predictive Science Inc.](https://www.predsci.com)  
+ 
+--------------------------------  
   
-Tool to trace field lines through 3D fields, includes generating open field maps and expansion factors.
+MapFL is a Fortran tool to trace field lines through 3D fields, including generating diagnostics such as open field maps, expansion factors, and Q-maps.
