@@ -1333,8 +1333,8 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      real(r_typ), dimension(:,:,:), pointer :: f
-      real(r_typ), dimension(:), pointer :: z
+      real(r_typ), dimension(:,:,:), contiguous, pointer :: f
+      real(r_typ), dimension(:), contiguous, pointer :: z
       integer :: n1,n2,n3
       logical :: add_phi_point
 c
@@ -7627,7 +7627,7 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      real(r_typ), dimension(:), pointer :: f
+      real(r_typ), dimension(:), contiguous, pointer :: f
       integer :: i,n
 c
 c-----------------------------------------------------------------------
