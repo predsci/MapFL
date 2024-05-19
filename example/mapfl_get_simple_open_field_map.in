@@ -1,5 +1,7 @@
 &datum
 !
+  verbose=1
+!
 ! File names for B field:
 !
   bfile%r='br.h5'
