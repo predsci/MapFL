@@ -32,7 +32,7 @@ HDF5_LIB_DIR="/usr/local/lib/"
 # Please set the HDF5 linker flags to match the installed version.
 ##################################################################
 
-HDF5_LIB_FLAGS="-lhdf5_fortran -lhdf5_hl_fortran -lhdf5 -lhdf5_hl"
+HDF5_LIB_FLAGS="-lhdf5_fortran -lhdf5hl_fortran -lhdf5 -lhdf5_hl"
 
 ###########################################################################
 # Please set the compile flags based on your compiler and hardware setup.
