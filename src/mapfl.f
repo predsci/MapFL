@@ -48,8 +48,8 @@ c-----------------------------------------------------------------------
 c
 c
       character(*), parameter :: cname='MAPFL'
-      character(*), parameter :: cvers='2.1.0'
-      character(*), parameter :: cdate='04/16/2024'
+      character(*), parameter :: cvers='2.1.1'
+      character(*), parameter :: cdate='06/20/2024'
 c
       end module
 c#######################################################################
@@ -663,7 +663,7 @@ c
 c
 c ****** Number of iterations to do in each thread.
 c
-      integer :: iterations_per_thread=500
+      integer :: iterations_per_thread=10
 c
       end module
 c#######################################################################
@@ -10662,6 +10662,11 @@ c           Note that "rss" is no longer a parameter for the feature
 c           (it was not being used anyways).
 c         - Updated intents and dummy variables to avoid
 c           argument type mismatches.
+c
+c        06/20/2025, RC/CD Version 2.1.1:
+c
+c         - Updated default iterations per thread for better
+c           performance.
 c
 c-----------------------------------------------------------------------
 c

@@ -4,7 +4,7 @@ ifeq ($(TARGET),)
   TARGET = mapfl
 endif
 
-FFLAGS = <FFLAGS> -I<HDF5_INCLUDE_DIR>
+FFLAGS = <FRTFLAGS> -I<HDF5_INCLUDE_DIR>
 
 OBJS = psi_io.o mapfl.o
 
@@ -13,6 +13,9 @@ LDFLAGS = -L<HDF5_LIB_DIR> <HDF5_LIB_FLAGS>
 all: $(OBJS)
 	$(FC) $(FFLAGS) $(OBJS) $(LDFLAGS) -o mapfl
 	rm *.o *.mod
+
+install:
+	mv mapfl ../bin/mapfl
 
 clean:
 	rm -f *.mod *.o *.so 2>/dev/null
