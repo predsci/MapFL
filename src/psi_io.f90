@@ -585,8 +585,9 @@ subroutine rdh5 (fname,s,ierr)
             deallocate (f8dim)
           end if
 !
-! ****** Close the scale dataset.
+! ****** Close the type and scale dataset.
 !
+          call h5Tclose_f (datatype_id,ierr)
           call h5Dclose_f (dim_id,ierr)
 !
         enddo
@@ -1054,6 +1055,7 @@ subroutine rdhdf_2d (fname,scale,nx,ny,f,x,y,ierr)
       scale=s%scale
       x=>s%scales(1)%f
       y=>s%scales(2)%f
+      deallocate (s%scales(3)%f)
 !
       allocate (f(nx,ny))
       f(:,:)=s%f(:,:,1)
