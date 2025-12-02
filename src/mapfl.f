@@ -9519,7 +9519,7 @@ c ****** otherwise this routine exits with an error.
 c
       if (n.eq.1) then
         if (xv.eq.x(1)) then
-          locate_interval=i
+          locate_interval=1
           return
         else
           go to 900
