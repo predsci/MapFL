@@ -17,6 +17,7 @@ c               Cooper Downs
 c               Roberto Lionello
 c               Ronald M. Caplan
 c               Emily Mason
+c               Miko M. Stulajter
 c
 c     Predictive Science Inc.
 c     www.predsci.com
@@ -48,8 +49,8 @@ c-----------------------------------------------------------------------
 c
 c
       character(*), parameter :: cname='MAPFL'
-      character(*), parameter :: cvers='2.1.1'
-      character(*), parameter :: cdate='06/20/2024'
+      character(*), parameter :: cvers='2.1.1acc'
+      character(*), parameter :: cdate='12/02/2025'
 c
       end module
 c#######################################################################
@@ -64,6 +65,7 @@ c
 c ****** Use double precision.
 c
       integer, parameter :: r_typ = REAL64
+      integer, parameter :: r_typl = REAL32
 c
       end module
 c#######################################################################
@@ -139,6 +141,7 @@ c
       end module
 c#######################################################################
       module locate_interval_interface
+!$acc routine(locate_interval) seq
       interface
         function locate_interval (n,x,xv,tab,ierr)
         use number_types
@@ -156,6 +159,7 @@ c#######################################################################
       end module
 c#######################################################################
       module evaluate_spline_3d_interface
+!$acc routine(evaluate_spline_3d) seq
       interface
         function evaluate_spline_3d (s,x,y,z,tabx,taby,tabz)
         use number_types
@@ -177,6 +181,7 @@ c
 c ****** Debugging level.
 c
       integer :: debug_level=0
+!$acc declare create(debug_level)
 c
       end module
 c#######################################################################
@@ -357,6 +362,7 @@ c
       real(r_typ), dimension(:), pointer :: rss
       real(r_typ), dimension(:), pointer :: tss
       real(r_typ), dimension(:), pointer :: pss
+!$acc declare create(rss,tss,pss)
 c
       end module
 c#######################################################################
@@ -418,6 +424,7 @@ c
 c ****** Field line integration.
 c
       type(flparam) :: ds
+!$acc declare create(ds)
       logical :: set_ds_automatically=.true.
       real(r_typ) :: dsmult=1.0_r_typ
 c
@@ -460,6 +467,7 @@ c ****** Switch to use an analytic function to define the magnetic
 c ****** field.
 c
       logical :: use_analytic_function=.false.
+!$acc declare create(use_analytic_function)
 c
 c ****** Flag to use 32-bit HDF output files.
 c
@@ -508,6 +516,7 @@ c ****** Number of iterations between prints of diagnostics
 c ****** during execution.
 c
       integer :: diagnostic_interval=1000
+!$acc declare create(diagnostic_interval)
 c
       end module
 c#######################################################################
@@ -644,12 +653,14 @@ c
       implicit none
 c
       integer :: gather_stats = 0
+!$acc declare create(gather_stats)
 c
       integer(8) :: stat_n=0
       real(r_typ) :: stat_ds_sum=0._r_typ
       real(r_typ) :: stat_ds_avg=0._r_typ
       real(r_typ) :: stat_ds_min=huge(0._r_typ)
       real(r_typ) :: stat_ds_max=0._r_typ
+!$acc declare create(stat_n,stat_ds_sum,stat_ds_min,stat_ds_max)
 c
       end module
 c#######################################################################
@@ -679,10 +690,12 @@ c
 c
       character(len=:), allocatable :: infile
       integer :: verbose = 0
+!$acc declare create(verbose)
 c
       end module
 c#######################################################################
       module interp_interface
+!$acc routine(interp) seq
       interface
         subroutine interp (n,x,xv,i,ip1,alpha,tab)
         use number_types
@@ -702,6 +715,7 @@ c#######################################################################
       end module
 c#######################################################################
       module tracefl_interface
+!$acc routine(tracefl) seq
       interface
         subroutine tracefl (b,ds,s0,s1,bs0,bs1,s,
      &                      traced_to_r_boundary,xt)
@@ -734,7 +748,7 @@ c
       logical :: do_integral_along_fl=.false.
       type(sds) :: scalar_field
       type(vtab) :: inv_sf
-
+!$acc declare create(scalar_field,inv_sf,do_integral_along_fl)
 c
       end module
 c#######################################################################
@@ -769,6 +783,7 @@ c
 c ****** Selected function index.
 c
       integer :: function_index=0
+!$acc declare create(function_index)
 c
       end module
 c#######################################################################
@@ -790,6 +805,7 @@ c ****** Parameters for the PFSS_BKG function.
 c
       real(r_typ) :: mu
       real(r_typ) :: rss
+!$acc declare create(b0,mu,rss)
 c
       end module
 c#######################################################################
@@ -2245,7 +2261,7 @@ c
       real(r_typ) :: dt,dp,aa,bb,cc,dd,stm,stp,tmav,efav
       logical :: wrote_cr
       integer :: n_completed,n_total,nc,diag_step
-      real(r_typ) :: pct_done
+      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -2279,20 +2295,15 @@ c
 c$omp parallel do
 c$omp& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
 c$omp& private(nc,diag_step,pct_done)
+c$omp& shared(n_completed,nbad)
 c$omp& collapse(2)
 c$omp& schedule(dynamic,iterations_per_thread)
+!$acc parallel loop collapse(2)
+!$acc& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
+!$acc& private(nc,diag_step,pct_done)
+!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
-c
-c ****** Update the iteration counter for diagnostic
-c ****** purposes.
-c
-          if (verbose.gt.0) then
-c$omp critical
-            n_completed=n_completed+1
-            nc=n_completed
-c$omp end critical
-          end if
 c
           xfl0(1)=b%lim0(1)
           xfl0(2)=tss(j)
@@ -2320,13 +2331,14 @@ c
             end if
           else
 c$omp critical
+!$acc atomic update
             nbad=nbad+1
-            write (*,*)
-            write (*,*) '### WARNING from MAP_FORWARD:'
-            write (*,*) '### A field line did not reach R0 or R1.'
-            write (*,*) 'Initial theta = ',xfl0(2)
-            write (*,*) 'Initial phi   = ',xfl0(3)
-            write (*,*) 'Final field line radius = ',xfl1(1)
+            write (*,*) achar(10)//
+     &        '### WARNING from MAP_FORWARD:'//achar(10)//
+     &        '### A field line did not reach R0 or R1.'//achar(10)//
+     &        'Initial theta = ',xfl0(2),achar(10)//
+     &        'Initial phi   = ',xfl0(3),achar(10)//
+     &        'Final field line radius = ',xfl1(1)
 c$omp end critical
             rfl(j,k)=-1._r_typ
             tfl(j,k)=-1._r_typ
@@ -2339,11 +2351,11 @@ c
           if (max_bad_fieldlines.gt.0) then
             if (nbad.gt.max_bad_fieldlines) then
 c$omp critical
-              write (*,*)
-              write (*,*) '### ERROR in MAP_FORWARD:'
-              write (*,*) '### Too many field lines did not reach'//
-     &                    ' R0 or R1.'
-              write (*,*) 'Number of bad traces = ',max_bad_fieldlines
+              write (*,*) achar(10)//
+     &          '### ERROR in MAP_FORWARD:'//achar(10)//
+     &          '### Too many field lines did not reach'//
+     &                     ' R0 or R1.'//achar(10)//
+     &          'Number of bad traces = ',max_bad_fieldlines
               call exit (1)
 c$omp end critical
             end if
@@ -2352,16 +2364,23 @@ c
 c ****** Write progress diagnostics if requested.
 c
           if (verbose.gt.0) then
+c$omp critical
+!$acc atomic capture
+            nc = n_completed
+            n_completed=n_completed+1
+!$acc end atomic
+c$omp end critical
+            nc = nc+1
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
-              pct_done=100.*nc/n_total
-              write (*,910) 'Fraction completed: ',pct_done
-  910         format (1x,a,f7.3,'%')
+              pct_done=100.0_r_typl*nc/n_total
+              write (*,*) 'Fraction completed: ',pct_done,'%'
             end if
           end if
 c
         enddo
       enddo
+!$acc end parallel
 c$omp end parallel do
 c
 c ****** Write the mapping.
@@ -2669,6 +2688,8 @@ c ***** Calculate slogq
 c
 !$omp parallel do collapse(2)
 !$omp& default(shared) private(i,j,q,lq,x,br,bv)
+!$acc parallel loop collapse(2) default(present)
+!$acc& private(i,j,q,lq,x,br,bv)
       do i=1,ntss-1
         do j=1,npss-1
           q=half*qfl(i,j)
@@ -2693,6 +2714,7 @@ c
           slogqfl(i,j)=lq
         enddo
       enddo
+!$acc end parallel
 !$omp end parallel do
 c
       end subroutine
@@ -2750,7 +2772,7 @@ c
       real(r_typ) :: dt,dp,aa,bb,cc,dd,stm,stp,tmav,efav
       logical :: wrote_cr
       integer :: n_completed,n_total,nc,diag_step
-      real(r_typ) :: pct_done
+      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -2785,20 +2807,15 @@ c$omp parallel do
 c$omp& default(shared)
 c$omp& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
 c$omp& private(nc,diag_step,pct_done)
+c$omp& shared(n_completed)
 c$omp& collapse(2)
 c$omp& schedule(dynamic,iterations_per_thread)
+!$acc parallel loop collapse(2) default(present)
+!$acc& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
+!$acc& private(nc,diag_step,pct_done)
+!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
-c
-c ****** Update the iteration counter for diagnostic
-c ****** purposes.
-c
-          if (verbose.gt.0) then
-c$omp critical (omp_nc)
-            n_completed=n_completed+1
-            nc=n_completed
-c$omp end critical (omp_nc)
-          end if
 c
           xfl0(1)=b%lim1(1)
           xfl0(2)=tss(j)
@@ -2823,13 +2840,14 @@ c
             end if
           else
 c$omp critical (nbad_count)
+!$acc atomic update
             nbad=nbad+1
-            write (*,*)
-            write (*,*) '### WARNING from MAP_BACKWARD:'
-            write (*,*) '### A field line did not reach R0 or R1.'
-            write (*,*) 'Initial theta = ',xfl0(2)
-            write (*,*) 'Initial phi   = ',xfl0(3)
-            write (*,*) 'Final field line radius = ',xfl1(1)
+            write (*,*) achar(10)//
+     &        '### WARNING from MAP_BACKWARD:'//achar(10)//
+     &        '### A field line did not reach R0 or R1.'//achar(10)//
+     &        'Initial theta = ',xfl0(2),achar(10)//
+     &        'Initial phi   = ',xfl0(3),achar(10)//
+     &        'Final field line radius = ',xfl1(1)
 c$omp end critical (nbad_count)
             rfl(j,k)=-1._r_typ
             tfl(j,k)=-1._r_typ
@@ -2842,11 +2860,11 @@ c
           if (max_bad_fieldlines.gt.0) then
             if (nbad.gt.max_bad_fieldlines) then
 c$omp critical (nbad2)
-              write (*,*)
-              write (*,*) '### ERROR in MAP_BACKWARD:'
-              write (*,*) '### Too many field lines did not reach'//
-     &                    ' R0 or R1.'
-              write (*,*) 'Number of bad traces = ',max_bad_fieldlines
+              write (*,*) achar(10)//
+     &          '### ERROR in MAP_BACKWARD:'//achar(10)//
+     &          '### Too many field lines did not reach'//
+     &            ' R0 or R1.'//achar(10)//
+     &          'Number of bad traces = ',max_bad_fieldlines
               call exit (1)
 c$omp end critical (nbad2)
             end if
@@ -2855,16 +2873,23 @@ c
 c ****** Write progress diagnostics if requested.
 c
           if (verbose.gt.0) then
+c$omp critical (omp_nc)
+!$acc atomic capture
+            nc = n_completed
+            n_completed=n_completed+1
+!$acc end atomic
+c$omp end critical (omp_nc)
+            nc = nc+1
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
-              pct_done=100.*nc/n_total
-              write (*,910) 'Fraction completed: ',pct_done
-  910         format (1x,a,f7.3,'%')
+              pct_done=100.0_r_typl*nc/n_total
+              write (*,*) 'Fraction completed: ',pct_done,'%'
             end if
           end if
 c
         enddo
       enddo
+!$acc end parallel
 c$omp end parallel do
 c
 c ****** Write the mapping.
@@ -3116,6 +3141,7 @@ c
       end
 c#######################################################################
       function modulo_twopi (x)
+!$acc routine(modulo_twopi) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -3193,7 +3219,7 @@ c
       real(r_typ) :: s
       logical :: wrote_cr
       integer :: n_completed,n_total,nc,diag_step
-      real(r_typ) :: pct_done
+      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -3221,21 +3247,16 @@ c
 c$omp parallel do
 c$omp& private(i,j,k,xfl0,xfl1,bs0,bs1,s,ttb)
 c$omp& private(nc,diag_step,pct_done)
+c$omp& shared(n_completed)
 c$omp& collapse(3)
 c$omp& schedule(dynamic,iterations_per_thread)
+!$acc parallel loop collapse(3)
+!$acc& private(i,j,k,xfl0,xfl1,bs0,bs1,s,ttb)
+!$acc& private(nc,diag_step,pct_done)
+!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
           do i=1,nrss
-c
-c ****** Update the iteration counter for diagnostic
-c ****** purposes.
-c
-            if (verbose.gt.0) then
-c$omp critical
-              n_completed=n_completed+1
-              nc=n_completed
-c$omp end critical
-            end if
 c
             xfl0(1)=rss(i)
             xfl0(2)=tss(j)
@@ -3254,17 +3275,24 @@ c
 c ****** Write progress diagnostics if requested.
 c
             if (verbose.gt.0) then
+c$omp critical
+!$acc atomic capture
+              nc = n_completed
+              n_completed=n_completed+1
+!$acc end atomic
+c$omp end critical
+              nc = nc+1
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
-                pct_done=100.*nc/n_total
-                write (*,910) 'Fraction completed: ',pct_done
-  910           format (1x,a,f7.3,'%')
+                pct_done=100.0_r_typl*nc/n_total
+                write (*,*) 'Fraction completed: ',pct_done,'%'
               end if
             end if
 c
           enddo
         enddo
       enddo
+!$acc end parallel
 c$omp end parallel do
 c
 c ****** Write the mapping.
@@ -3599,7 +3627,7 @@ c
       type(flparam) :: ds_f,ds_b
       logical :: wrote_cr
       integer :: n_completed,n_total,nc,diag_step
-      real(r_typ) :: pct_done
+      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -3722,21 +3750,16 @@ c
 c$omp parallel do
 c$omp& private(i,j,k,c,xfl0,xfl1,bs0,bs1,s,ttb)
 c$omp& private(nc,diag_step,pct_done)
+c$omp& shared(n_completed)
 c$omp& collapse(3)
 c$omp& schedule(dynamic,iterations_per_thread)
+!$acc parallel loop collapse(3)
+!$acc& private(i,j,k,c,xfl0,xfl1,bs0,bs1,s,ttb)
+!$acc& private(nc,diag_step,pct_done)
+!$acc& copy(n_completed)
       do k=1,n3
         do j=1,n2
           do i=1,n1
-c
-c ****** Update the iteration counter for diagnostic
-c ****** purposes.
-c
-            if (verbose.gt.0) then
-c$omp critical
-              n_completed=n_completed+1
-              nc=n_completed
-c$omp end critical
-            end if
 c
             if (slice_coords_are_xyz) then
               c=(/slice_c1%f(i,j,k),
@@ -3820,17 +3843,24 @@ c
 c ****** Write progress diagnostics if requested.
 c
             if (verbose.gt.0) then
+c$omp critical
+!$acc atomic capture
+              nc = n_completed
+              n_completed=n_completed+1
+!$acc end atomic
+c$omp end critical
+              nc = nc+1
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
-                pct_done=100.*nc/n_total
-                write (*,910) 'Fraction completed: ',pct_done
-  910           format (1x,a,f7.3,'%')
+                pct_done=100.0_r_typl*nc/n_total
+                write (*,*) 'Fraction completed: ',pct_done,'%'
               end if
             end if
 c
           enddo
         enddo
       enddo
+!$acc end parallel
 c$omp end parallel do
 c
 c ****** Write the forward mapping.
@@ -4235,7 +4265,7 @@ c
       logical :: f_br_positive
       logical :: b_br_positive
       integer :: n_completed,n_total,nc,diag_step
-      real(r_typ) :: pct_done
+      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -4295,20 +4325,19 @@ c$omp& private(f_trace_on_r0,f_trace_on_r1)
 c$omp& private(b_trace_reached_boundary,b_br_positive)
 c$omp& private(b_trace_on_r0,b_trace_on_r1)
 c$omp& private(nc,diag_step,pct_done)
+c$omp& shared(n_completed)
 c$omp& collapse(2)
 c$omp& schedule(dynamic,iterations_per_thread)
+!$acc parallel loop collapse(2)
+!$acc& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
+!$acc& private(f_trace_reached_boundary,f_br_positive)
+!$acc& private(f_trace_on_r0,f_trace_on_r1)
+!$acc& private(b_trace_reached_boundary,b_br_positive)
+!$acc& private(b_trace_on_r0,b_trace_on_r1)
+!$acc& private(nc,diag_step,pct_done)
+!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
-c
-c ****** Update the iteration counter for diagnostic
-c ****** purposes.
-c
-          if (verbose.gt.0) then
-c$omp critical
-            n_completed=n_completed+1
-            nc=n_completed
-c$omp end critical
-          end if
 c
           xfl0(1)=rv
           xfl0(2)=tss(j)
@@ -4386,16 +4415,23 @@ c
 c ****** Write progress diagnostics if requested.
 c
           if (verbose.gt.0) then
+c$omp critical
+!$acc atomic capture
+            nc = n_completed
+            n_completed=n_completed+1
+!$acc end atomic
+c$omp end critical
+            nc = nc+1
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
-              pct_done=100.*nc/n_total
-              write (*,910) 'Fraction completed: ',pct_done
-  910         format (1x,a,f7.3,'%')
+              pct_done=100.0_r_typl*nc/n_total
+              write (*,*) 'Fraction completed: ',pct_done,'%'
             end if
           end if
 c
         enddo
       enddo
+!$acc end parallel
 c$omp end parallel do
 c
 c ****** Write the coronal hole map.
@@ -4469,7 +4505,7 @@ c
       logical :: f_br_positive
       logical :: b_br_positive
       integer :: n_completed,n_total,nc,diag_step
-      real(r_typ) :: pct_done
+      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -4516,21 +4552,20 @@ c$omp& private(f_trace_on_r0,f_trace_on_r1)
 c$omp& private(b_trace_reached_boundary,b_br_positive)
 c$omp& private(b_trace_on_r0,b_trace_on_r1)
 c$omp& private(nc,diag_step,pct_done)
+c$omp& shared(n_completed)
 c$omp& collapse(3)
 c$omp& schedule(dynamic,iterations_per_thread)
+!$acc parallel loop collapse(3)
+!$acc& private(i,j,k,xfl0,xfl1,bs0,bs1,s,ttb)
+!$acc& private(f_trace_reached_boundary,f_br_positive)
+!$acc& private(f_trace_on_r0,f_trace_on_r1)
+!$acc& private(b_trace_reached_boundary,b_br_positive)
+!$acc& private(b_trace_on_r0,b_trace_on_r1)
+!$acc& private(nc,diag_step,pct_done)
+!$acc& copy(n_completed)
       do i=1,nrss
         do k=1,npss
           do j=1,ntss
-c
-c ****** Update the iteration counter for diagnostic
-c ****** purposes.
-c
-            if (verbose.gt.0) then
-c$omp critical
-              n_completed=n_completed+1
-              nc=n_completed
-c$omp end critical
-            end if
 c
             xfl0(1)=rss(i)
             xfl0(2)=tss(j)
@@ -4608,17 +4643,24 @@ c
 c ****** Write progress diagnostics if requested.
 c
             if (verbose.gt.0) then
+c$omp critical
+!$acc atomic capture
+              nc = n_completed
+              n_completed=n_completed+1
+!$acc end atomic
+c$omp end critical
+              nc = nc+1
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
-                pct_done=100.*nc/n_total
-                write (*,910) 'Fraction completed: ',pct_done
-  910           format (1x,a,f7.3,'%')
+                pct_done=100.0_r_typl*nc/n_total
+                write (*,*) 'Fraction completed: ',pct_done,'%'
               end if
             end if
 c
           enddo
         enddo
       enddo
+!$acc end parallel
 c$omp end parallel do
 c
 c ****** Write the coronal hole map.
@@ -5819,6 +5861,7 @@ c
 c#######################################################################
       subroutine tracefl (b,ds,s0,s1,bs0,bs1,s,
      &                    traced_to_r_boundary,xt)
+!$acc routine(tracefl) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -5907,7 +5950,7 @@ c
         write (*,*)
         write (*,*) '### COMMENT from TRACEFL:'
         write (*,*) '### Starting a new trace:'
-        write (*,*) 'S0 = ',S0
+c        write (*,*) 'S0 = ',S0
       end if
 c
 c ****** Initializations.
@@ -5948,7 +5991,7 @@ c
         x%s=s0
         call sph_to_cart (x)
         s=0.
-        if (store_trace) call add_trajectory_point (xt,x%s)
+c        if (store_trace) call add_trajectory_point (xt,x%s)
 c
 c ****** Set the starting step size.
 c
@@ -5957,7 +6000,7 @@ c
         if (debug_level.ge.4) then
           write (*,*)
           write (*,*) 'Start of trace:'
-          write (*,*) 'X = ',x%s
+c          write (*,*) 'X = ',x%s
         end if
 c
 c ****** If the initial point is outside the domain, stop tracing.
@@ -6011,7 +6054,7 @@ c
             write (*,*) '### The trace encountered a null pnt (B = 0).'
             write (*,*) '### This occurred at the start of the trace.'
             write (*,*) '### Abandoning the trace ...'
-            write (*,*) 'Location (r,t,p) = ',x%s
+c            write (*,*) 'Location (r,t,p) = ',x%s
             tfc=.true.
             exit
           end if
@@ -6076,7 +6119,7 @@ c
             write (*,*)
             write (*,*) 'Predictor:'
             write (*,*) 'N = ',n
-            write (*,*) 'BV = ',bv%s
+c            write (*,*) 'BV = ',bv%s
           end if
 c
           dsss=half*idir0*dss
@@ -6084,7 +6127,7 @@ c
 c
           if (debug_level.ge.4) then
             write (*,*) 'DSSS = ',dsss
-            write (*,*) 'XP = ',xp%s
+c            write (*,*) 'XP = ',xp%s
           end if
 c
 c ****** Check if the field line has exited the domain.
@@ -6129,16 +6172,16 @@ c
                 write (*,*) '### Could not get the clip fraction.'
                 write (*,*)
                 write (*,*) '### Debugging info:'
-                write (*,*) 'S0 = ',s0
+c                write (*,*) 'S0 = ',S0
                 write (*,*) 'DS%DIRECTION_IS_ALONG_B = ',
      &                      ds%direction_is_along_b
                 write (*,*) 'DS%DIRECTION = ',ds%direction
                 write (*,*) 'DS%MIN = ',current_ds%min
                 write (*,*) 'DS%MAX = ',current_ds%max
                 write (*,*) 'DSSS = ',dsss
-                write (*,*) 'BV = ',bv
-                write (*,*) 'XO = ',xo
-                write (*,*) 'XP = ',xp
+c                write (*,*) 'BV = ',bv
+c                write (*,*) 'XO = ',xo
+c                write (*,*) 'XP = ',xp
                 tfc=.true.
                 exit
               end if
@@ -6163,7 +6206,7 @@ c
 c
                 if (debug_level.ge.4) then
                   write (*,*) 'After CLIP_TO_R_BOUNDARY (predictor):'
-                  write (*,*) 'XP = ',xp%s
+c                  write (*,*) 'XP = ',xp%s
                 end if
 c
                 x=xp
@@ -6190,7 +6233,7 @@ c
 c
               if (debug_level.ge.4) then
                 write (*,*) 'After 2nd predictor:'
-                write (*,*) 'XP = ',xp%s
+c                write (*,*) 'XP = ',xp%s
               end if
 c
 c ****** Check if the predicted point has exited the domain.
@@ -6204,16 +6247,16 @@ c
                 write (*,*) '### Point is outside the boundary.'
                 write (*,*)
                 write (*,*) '### Debugging info:'
-                write (*,*) 'S0 = ',s0
+c                write (*,*) 'S0 = ',s0
                 write (*,*) 'DS%DIRECTION_IS_ALONG_B = ',
      &                  ds%direction_is_along_b
                 write (*,*) 'DS%DIRECTION = ',ds%direction
                 write (*,*) 'DS%MIN = ',current_ds%min
                 write (*,*) 'DS%MAX = ',current_ds%max
                 write (*,*) 'DSSS = ',dsss
-                write (*,*) 'BV = ',bv
-                write (*,*) 'XO = ',xo
-                write (*,*) 'XP = ',xp
+c                write (*,*) 'BV = ',bv
+c                write (*,*) 'XO = ',xo
+c                write (*,*) 'XP = ',xp
                 tfc=.true.
                 exit
               end if
@@ -6241,7 +6284,7 @@ c
             write (*,*) '### The trace encountered a null pnt (B = 0).'
             write (*,*) '### This occurred during the corrector.'
             write (*,*) '### Abandoning the trace ...'
-            write (*,*) 'Location (r,t,p) = ',xp%s
+c            write (*,*) 'Location (r,t,p) = ',xp%s
             exit
           end if
 c
@@ -6250,9 +6293,9 @@ c
 c
           if (debug_level.ge.4) then
             write (*,*) 'After corrector advance:'
-            write (*,*) 'BV = ',bv%s
+c            write (*,*) 'BV = ',bv%s
             write (*,*) 'DSSS = ',dsss
-            write (*,*) 'X = ',x%s
+c            write (*,*) 'X = ',x%s
           end if
 c
           if (outside_domain(b,x,outside)) then
@@ -6278,16 +6321,16 @@ c
                 write (*,*) '### Could not get the clip fraction.'
                 write (*,*)
                 write (*,*) '### Debugging info:'
-                write (*,*) 'S0 = ',s0
+c                write (*,*) 'S0 = ',s0
                 write (*,*) 'DS%DIRECTION_IS_ALONG_B = ',
      &                      ds%direction_is_along_b
                 write (*,*) 'DS%DIRECTION = ',ds%direction
                 write (*,*) 'DS%MIN = ',current_ds%min
                 write (*,*) 'DS%MAX = ',current_ds%max
                 write (*,*) 'DSSS = ',dsss
-                write (*,*) 'BV = ',bv
-                write (*,*) 'XO = ',xo
-                write (*,*) 'X  = ',x
+c                write (*,*) 'BV = ',bv
+c                write (*,*) 'XO = ',xo
+c                write (*,*) 'X  = ',x
                 tfc=.true.
                 exit
               end if
@@ -6312,7 +6355,7 @@ c
                 if (debug_level.ge.4) then
                   write (*,*) 'The trace went from the boundary to'//
      &                        ' the outside (corrector):'
-                  write (*,*) 'X = ',x%s
+c                 write (*,*) 'X = ',x%s
                 end if
 c
                 exit
@@ -6324,7 +6367,7 @@ c
 c
                 if (debug_level.ge.4) then
                   write (*,*) 'After CLIP_TO_R_BOUNDARY (corrector):'
-                  write (*,*) 'X = ',x%s
+c                  write (*,*) 'X = ',x%s
                 end if
 c
               end if
@@ -6343,7 +6386,7 @@ c
 c ****** Add the current position to the field line buffer
 c ****** if requested.
 c
-          if (store_trace) call add_trajectory_point (xt,x%s)
+c          if (store_trace) call add_trajectory_point (xt,x%s)
 c
 c ****** Break out of max_n loop if done.
 c
@@ -6394,17 +6437,21 @@ c
         write (*,*) 'CURRENT_DS%OVER_RC = ',current_ds%over_rc
         write (*,*) 'CURRENT_DS%MIN = ',current_ds%min
         write (*,*) 'CURRENT_DS%MAX = ',current_ds%max
-        write (*,*) 'S0 = ',s0
-        write (*,*) 'S1 = ',x%s
+c        write (*,*) 'S0 = ',s0
+c        write (*,*) 'S1 = ',x%s
       end if
 c
 c ****** Update the step size statistics.
 c
       if (gather_stats.gt.0) then
 c$omp critical (omp_stat)
+!$acc atomic update
         stat_n=stat_n+local_stat_n
+!$acc atomic update
         stat_ds_sum=stat_ds_sum+local_stat_ds_sum
+!$acc atomic
         stat_ds_min=min(stat_ds_min,local_stat_ds_min)
+!$acc atomic
         stat_ds_max=max(stat_ds_max,local_stat_ds_max)
 c$omp end critical (omp_stat)
       end if
@@ -6434,15 +6481,16 @@ c
         write (*,*) '### About to exit:'
         write (*,*) 'N = ',n
         write (*,*) 'S = ',s
-        write (*,*) 'S1 = ',s1
-        write (*,*) 'BS0 = ',bs0
-        write (*,*) 'BS1 = ',bs1
+c        write (*,*) 'S1 = ',s1
+c        write (*,*) 'BS0 = ',bs0
+c        write (*,*) 'BS1 = ',bs1
       end if
 c
       return
       end
 c#######################################################################
       subroutine get_ds (b,x,v0,v1,ds_v,ds,deltas)
+!$acc routine(get_ds) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -6547,6 +6595,7 @@ c
       end
 c#######################################################################
       subroutine get_local_mesh_size (b,s,ds)
+!$acc routine(get_local_mesh_size) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -6599,6 +6648,7 @@ c
       end
 c#######################################################################
       subroutine normalize_v (v,null)
+!$acc routine(normalize_v) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -6642,6 +6692,7 @@ c
       end
 c#######################################################################
       subroutine advance (x,v,ds)
+!$acc routine(advance) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -6681,6 +6732,7 @@ c
       end
 c#######################################################################
       subroutine get_r_clip_fraction (b,x0,x1,outside_r0,frac,ierr)
+!$acc routine(get_r_clip_fraction) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -6814,6 +6866,7 @@ c
       end
 c#######################################################################
       subroutine clip_to_r_boundary (b,x0,x1,outside_r0,frac)
+!$acc routine(clip_to_r_boundary) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -6996,6 +7049,7 @@ c
       end
 c#######################################################################
       subroutine cart_to_sph (x)
+!$acc routine(cart_to_sph) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -7022,6 +7076,7 @@ c
       end
 c#######################################################################
       subroutine sph_to_cart (x)
+!$acc routine(sph_to_cart) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -7048,6 +7103,7 @@ c
       end
 c#######################################################################
       subroutine c2s (x,s)
+!$acc routine(c2s) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -7107,6 +7163,7 @@ c
       end
 c#######################################################################
       subroutine s2c (s,x)
+!$acc routine(s2c) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -7222,6 +7279,7 @@ c
       end
 c#######################################################################
       subroutine getb (b,x,bv)
+!$acc routine(getb) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -7350,6 +7408,7 @@ c
       end
 c#######################################################################
       subroutine getsf (x,sf)
+!$acc routine(getsf) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -7409,6 +7468,7 @@ c
       end
 c#######################################################################
       subroutine interp_3d (nx,ny,nz,x,y,z,inv,f,xv,yv,zv,fv)
+!$acc routine(interp_3d) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -7784,6 +7844,7 @@ c
       end
 c#######################################################################
       subroutine interp (n,x,xv,i,ip1,alpha,tab)
+!$acc routine(interp) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -8029,8 +8090,11 @@ c
 c
 c$omp parallel default(shared)
 c$omp& private(i,j,k,gx,gppx,gy,gppy,gz,gppz)
+!$acc parallel default(present)
+!$acc& private(i,j,k,gx,gppx,gy,gppy,gz,gppz)
 c
 c$omp do collapse(2) schedule(dynamic)
+!$acc loop collapse(2)
       do k=1,nz
         do j=1,ny
           gx(:)=s%f(:,j,k)
@@ -8041,6 +8105,7 @@ c$omp do collapse(2) schedule(dynamic)
 c$omp end do
 c
 c$omp do collapse(2) schedule(dynamic)
+!$acc loop collapse(2)
       do k=1,nz
         do i=1,nx
           gy(:)=s%f(i,:,k)
@@ -8051,6 +8116,7 @@ c$omp do collapse(2) schedule(dynamic)
 c$omp end do
 c
 c$omp do collapse(2) schedule(dynamic)
+!$acc loop collapse(2)
       do j=1,ny
         do i=1,nx
           gz(:)=s%f(i,j,:)
@@ -8058,12 +8124,15 @@ c$omp do collapse(2) schedule(dynamic)
           s%fzz(i,j,:)=gppz(:)
         enddo
       enddo
+!$acc end parallel
 c$omp end do
 c$omp end parallel
 c
 c$omp parallel default(shared)
 c$omp& private(i,j,k,gx,gppx,gy,gppy,gz,gppz)
 c$omp do collapse(2) schedule(dynamic)
+!$acc parallel loop collapse(2) default(present)
+!$acc& private(i,j,k,gx,gppx,gy,gppy,gz,gppz)
       do k=1,nz
         do i=1,nx
           gy(:)=s%fxx(i,:,k)
@@ -8071,12 +8140,15 @@ c$omp do collapse(2) schedule(dynamic)
           s%fxxyy(i,:,k)=gppy(:)
         enddo
       enddo
+!$acc end parallel
 c$omp end do
 c$omp end parallel
 c
 c$omp parallel default(shared)
 c$omp& private(i,j,k,gx,gppx,gy,gppy,gz,gppz)
 c$omp do collapse(2) schedule(dynamic)
+!$acc parallel loop collapse(2) default(present)
+!$acc& private(i,j,k,gx,gppx,gy,gppy,gz,gppz)
       do j=1,ny
         do i=1,nx
           gz(:)=s%fxx(i,j,:)
@@ -8090,6 +8162,7 @@ c$omp do collapse(2) schedule(dynamic)
           s%fxxyyzz(i,j,:)=gppz(:)
         enddo
       enddo
+!$acc end parallel
 c$omp end do
 c$omp end parallel
 c
@@ -8296,6 +8369,7 @@ c
       end
 c#######################################################################
       function evaluate_spline_3d (s,x,y,z,tabx,taby,tabz)
+!$acc routine(evaluate_spline_3d) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -8503,6 +8577,7 @@ c
       end
 c#######################################################################
       subroutine spline (n,x,f,ibc0,c0,ibc1,c1,fpp)
+!$acc routine(spline) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -8602,7 +8677,7 @@ c
         write (*,*) '### Invalid number of points specified.'
         write (*,*) '### At least 3 points must be used.'
         write (*,*) 'Number of points specified = ',n
-        call exit (1)
+        return
       end if
 c
 c ****** Check that the mesh is monotonic.
@@ -8619,7 +8694,7 @@ c
           do j=1,n
             write (*,*) j,x(j)
           enddo
-          call exit (1)
+          return
         end if
         dxm=dx
       enddo
@@ -8704,7 +8779,7 @@ c
           write (*,*) '### Boundary condition type IBC0 = 6.'
           write (*,*) '### It is illegal for both C0(2) and C0(3)'//
      &                ' to be zero.'
-          call exit (1)
+          return
         end if
 c
         if (c0(2).ne.0.) then
@@ -8744,7 +8819,7 @@ c
         write (*,*) '### Invalid boundary condition specified at X(1).'
         write (*,*) '### IBC0 is invalid.'
         write (*,*) 'IBC0 = ',ibc0
-        call exit (1)
+        return
 c
       end select
 c
@@ -8813,7 +8888,7 @@ c
           write (*,*) '### Boundary condition type IBC1 = 6.'
           write (*,*) '### It is illegal for both C1(2) and C1(3)'//
      &                ' to be zero.'
-          call exit (1)
+         return
         end if
 c
         if (c1(2).ne.0.) then
@@ -8853,7 +8928,7 @@ c
         write (*,*) '### Invalid boundary condition specified at X(N).'
         write (*,*) '### IBC1 is invalid.'
         write (*,*) 'IBC1 = ',ibc1
-        call exit (1)
+        return
 c
       end select
 c
@@ -8876,7 +8951,7 @@ c
         do j=1,n
           write (*,*) j,x(j)
         enddo
-        call exit (1)
+        return
       end if
 c
       return
@@ -9158,6 +9233,7 @@ c
       end
 c#######################################################################
       subroutine ezspline (n,x,f,fpp)
+!$acc routine(ezspline) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -9335,6 +9411,7 @@ c
       end
 c#######################################################################
       subroutine speval_get_abcd (x1,x2,xv,a,b,c,d)
+!$acc routine(speval_get_abcd) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -9400,6 +9477,7 @@ c
       end
 c#######################################################################
       function speval_abcd (a,b,c,d,f1,f2,fpp1,fpp2)
+!$acc routine(speval_abcd) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -9451,6 +9529,7 @@ c
       end
 c#######################################################################
       function locate_interval (n,x,xv,tab,ierr)
+!$acc routine(locate_interval) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -9604,7 +9683,7 @@ c
         write (*,*) 'Value requested = ',xv
         write (*,*) 'Minimum table value = ',x(1)
         write (*,*) 'Maximum table value = ',x(n)
-        call exit (1)
+        return
       end if
 c
       end
@@ -10154,6 +10233,7 @@ c
       end
 c#######################################################################
       subroutine magnetic_field_function (time,rtp,s,v)
+!$acc routine(magnetic_field_function) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -10218,13 +10298,14 @@ c
         write (*,*) '### ERROR in MAGNETIC_FIELD_FUNCTION:'
         write (*,*) '### Invalid function requested:'
         write (*,*) 'FUNCTION_INDEX = ',function_index
-        call exit (1)
+        return
       end select
 c
       return
       end
 c#######################################################################
       function br_pfss_bkg (r, theta, phi, mu, Rss)
+!$acc routine(br_pfss_bkg) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -10260,6 +10341,7 @@ c
       end
 c#######################################################################
       function bt_pfss_bkg (r, theta, phi, mu, Rss)
+!$acc routine(bt_pfss_bkg) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -10295,6 +10377,7 @@ c
       end
 c#######################################################################
       function bp_pfss_bkg (r, theta, phi, mu, Rss)
+!$acc routine(bp_pfss_bkg) seq
 c
 c-----------------------------------------------------------------------
 c
@@ -10667,6 +10750,13 @@ c        06/20/2025, RC/CD Version 2.1.1:
 c
 c         - Updated default iterations per thread for better
 c           performance.
+c
+c        12/02/2025, MS Version 2.1.1 ACC:
+c
+c         - Added OpenACC for NVIDIA GPU offload with unified memory.
+c         - NOTE: This disables some error checking, some verbose 
+c           output, and saving field lines
+c         - This branch is designed to be used with SWiG.
 c
 c-----------------------------------------------------------------------
 c
