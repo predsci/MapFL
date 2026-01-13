@@ -48,8 +48,8 @@ c-----------------------------------------------------------------------
 c
 c
       character(*), parameter :: cname='MAPFL'
-      character(*), parameter :: cvers='2.1.1'
-      character(*), parameter :: cdate='06/20/2024'
+      character(*), parameter :: cvers='2.2.0'
+      character(*), parameter :: cdate='01/12/2026'
 c
       end module
 c#######################################################################
@@ -874,6 +874,7 @@ c
         write (*,*) 'File name: ',trim(infile)
         call exit (1)
       end if
+      close (8)
 c
 c ****** Read the input file.
 c
@@ -10641,21 +10642,15 @@ c         - Small modifications for Python/f2py cross compilation.
 c         - Debug statements in mesh detection, tweak to OLD MAS check.
 c         - Changed version numbering to standard style.
 c
-c        05/10/2022, EM,CD Version 2.0.6:
+c        05/10/2022, EM,CD Version 2.0.6
 c
 c         - Changed logic for slice mapping. If compute_q_on_slice
 c           is true, then the direct mapping will also be done after.
 c         - This makes it easier to get everything at once.
 c
-c        04/16/2024, RC Version 2.1.0:
+c        01/12/2026, RC Version 2.1.0:
 c
-c         - Moved changelog to bottom fo code.
-c         - Changed verbose to a namelist parameter and an integer
-c           (set greater than 0 to activate).
-c         - Changed stats variable to an integer to match verbose.
-c         - Changed command line.  Now, use as: mapfl INFILE
-c           If INFILE is not supplied, it defaults to "mapfl.in".
-c         - Added number_types module.
+c         - Moved changelog to bottom of code.
 c         - Integrated analytic magnetic field modules and routines
 c           into main code and namelist.
 c           Note that "rss" is no longer a parameter for the feature
@@ -10663,10 +10658,22 @@ c           (it was not being used anyways).
 c         - Updated intents and dummy variables to avoid
 c           argument type mismatches.
 c
-c        06/20/2025, RC/CD Version 2.1.1:
+c        01/12/2026, RC/CD Version 2.1.1:
 c
 c         - Updated default iterations per thread for better
 c           performance.
+c
+c        01/12/2026, RC/CD Version 2.2.0:
+c
+c         - Changed verbose to an integer and stats var to match.
+c
+c        01/12/2026, RC/CD Version 2.3.0:
+c
+c         - Changed verbose to a namelist parameter
+c           (set greater than 0 to activate).
+c         - Changed command line.  Now, use as: mapfl INFILE
+c           If INFILE is not supplied, it defaults to "mapfl.in".
+c         - Added number_types module.
 c
 c-----------------------------------------------------------------------
 c
