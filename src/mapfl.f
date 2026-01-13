@@ -49,8 +49,8 @@ c-----------------------------------------------------------------------
 c
 c
       character(*), parameter :: cname='MAPFL'
-      character(*), parameter :: cvers='2.2.0acc'
-      character(*), parameter :: cdate='01/12/2026'
+      character(*), parameter :: cvers='2.3.1acc'
+      character(*), parameter :: cdate='01/13/2026'
 c
       end module
 c#######################################################################
@@ -2367,11 +2367,10 @@ c
           if (verbose.gt.0) then
 c$omp critical
 !$acc atomic capture
-            nc = n_completed
             n_completed=n_completed+1
+            nc = n_completed
 !$acc end atomic
 c$omp end critical
-            nc = nc+1
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
               pct_done=100.0_r_typl*nc/n_total
@@ -2876,11 +2875,10 @@ c
           if (verbose.gt.0) then
 c$omp critical (omp_nc)
 !$acc atomic capture
-            nc = n_completed
             n_completed=n_completed+1
+            nc = n_completed
 !$acc end atomic
 c$omp end critical (omp_nc)
-            nc = nc+1
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
               pct_done=100.0_r_typl*nc/n_total
@@ -3278,11 +3276,10 @@ c
             if (verbose.gt.0) then
 c$omp critical
 !$acc atomic capture
-              nc = n_completed
               n_completed=n_completed+1
+              nc = n_completed
 !$acc end atomic
 c$omp end critical
-              nc = nc+1
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.0_r_typl*nc/n_total
@@ -3846,11 +3843,10 @@ c
             if (verbose.gt.0) then
 c$omp critical
 !$acc atomic capture
-              nc = n_completed
               n_completed=n_completed+1
+              nc = n_completed
 !$acc end atomic
 c$omp end critical
-              nc = nc+1
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.0_r_typl*nc/n_total
@@ -4418,11 +4414,10 @@ c
           if (verbose.gt.0) then
 c$omp critical
 !$acc atomic capture
-            nc = n_completed
             n_completed=n_completed+1
+            nc = n_completed
 !$acc end atomic
 c$omp end critical
-            nc = nc+1
             diag_step=mod(nc,diagnostic_interval)
             if (diag_step.eq.0) then
               pct_done=100.0_r_typl*nc/n_total
@@ -4646,11 +4641,10 @@ c
             if (verbose.gt.0) then
 c$omp critical
 !$acc atomic capture
-              nc = n_completed
               n_completed=n_completed+1
+              nc = n_completed
 !$acc end atomic
 c$omp end critical
-              nc = nc+1
               diag_step=mod(nc,diagnostic_interval)
               if (diag_step.eq.0) then
                 pct_done=100.0_r_typl*nc/n_total
@@ -10758,7 +10752,7 @@ c         - Changed command line.  Now, use as: mapfl INFILE
 c           If INFILE is not supplied, it defaults to "mapfl.in".
 c         - Added number_types module.
 c
-c        12/02/2025, MS Version 2.3.0 ACC:
+c        12/02/2025, MS Version 2.3.1 ACC:
 c
 c         - Added OpenACC for NVIDIA GPU offload with unified memory.
 c         - NOTE: This disables some error checking, some verbose 
