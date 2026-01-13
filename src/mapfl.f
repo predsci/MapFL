@@ -2079,7 +2079,7 @@ c ****** Set the field line integration step size.
 c
 c-----------------------------------------------------------------------
 c
-c ****** If SET_DS_AUTOMATICALLY=.T., the miniumum step size is set
+c ****** If SET_DS_AUTOMATICALLY=.T., the minimum step size is set
 c ****** to the minimum of the cell dimensions from the magnetic
 c ****** field files, and the maximum step size is set to the
 c ****** maximum of the cell dimensions.  Otherwise, the values read
@@ -3635,7 +3635,7 @@ c
       end if
 c
 c ****** Set the tracing direction to be either along the direction
-c ****** of the magnetic field or along the directon of increasing
+c ****** of the magnetic field or along the direction of increasing
 c ****** radius.
 c
       ds%direction_is_along_b=trace_slice_direction_is_along_b
