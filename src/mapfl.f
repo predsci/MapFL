@@ -49,8 +49,8 @@ c-----------------------------------------------------------------------
 c
 c
       character(*), parameter :: cname='MAPFL'
-      character(*), parameter :: cvers='2.3.1acc'
-      character(*), parameter :: cdate='01/13/2026'
+      character(*), parameter :: cvers='2.3.1acc1.1'
+      character(*), parameter :: cdate='01/21/2026'
 c
       end module
 c#######################################################################
@@ -2225,7 +2225,6 @@ c
       use files
       use params
       use field_line_params
-      use diags
       use openmp_vars
       use tracefl_interface
 c
@@ -2261,8 +2260,6 @@ c
       real(r_typ) :: dtdt,dtdp,dpdt,dpdp
       real(r_typ) :: dt,dp,aa,bb,cc,dd,stm,stp,tmav,efav
       logical :: wrote_cr
-      integer :: n_completed,n_total,nc,diag_step
-      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -2290,19 +2287,13 @@ c
       ds%direction_is_along_b=.false.
       ds%direction=1
 c
-      n_total=ntss*npss
-      n_completed=0
-c
 c$omp parallel do
 c$omp& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
-c$omp& private(nc,diag_step,pct_done)
-c$omp& shared(n_completed,nbad)
+c$omp& shared(nbad)
 c$omp& collapse(2)
 c$omp& schedule(dynamic,iterations_per_thread)
 !$acc parallel loop collapse(2)
 !$acc& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
-!$acc& private(nc,diag_step,pct_done)
-!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
 c
@@ -2334,12 +2325,6 @@ c
 c$omp critical
 !$acc atomic update
             nbad=nbad+1
-            write (*,*) achar(10)//
-     &        '### WARNING from MAP_FORWARD:'//achar(10)//
-     &        '### A field line did not reach R0 or R1.'//achar(10)//
-     &        'Initial theta = ',xfl0(2),achar(10)//
-     &        'Initial phi   = ',xfl0(3),achar(10)//
-     &        'Final field line radius = ',xfl1(1)
 c$omp end critical
             rfl(j,k)=-1._r_typ
             tfl(j,k)=-1._r_typ
@@ -2348,40 +2333,30 @@ c$omp end critical
             efl(j,k)=0.
             kfl(j,k)=-50._r_typ
           end if
-c
-          if (max_bad_fieldlines.gt.0) then
-            if (nbad.gt.max_bad_fieldlines) then
-c$omp critical
-              write (*,*) achar(10)//
-     &          '### ERROR in MAP_FORWARD:'//achar(10)//
-     &          '### Too many field lines did not reach'//
-     &                     ' R0 or R1.'//achar(10)//
-     &          'Number of bad traces = ',max_bad_fieldlines
-              call exit (1)
-c$omp end critical
-            end if
-          end if
-c
-c ****** Write progress diagnostics if requested.
-c
-          if (verbose.gt.0) then
-c$omp critical
-!$acc atomic capture
-            n_completed=n_completed+1
-            nc = n_completed
-!$acc end atomic
-c$omp end critical
-            diag_step=mod(nc,diagnostic_interval)
-            if (diag_step.eq.0) then
-              pct_done=100.0_r_typl*nc/n_total
-              write (*,*) 'Fraction completed: ',pct_done,'%'
-            end if
-          end if
-c
         enddo
       enddo
 !$acc end parallel
 c$omp end parallel do
+c
+c ****** Check for too many bad field lines and exit if needed.
+c
+      if (max_bad_fieldlines.gt.0.and.nbad.gt.max_bad_fieldlines) then
+        write (*,*) achar(10)//
+     &    '### ERROR in MAP_FORWARD:'//achar(10)//
+     &    '### Too many field lines did not reach'//
+     &               ' R0 or R1.'//achar(10)//
+     &    'Number of bad traces = ',max_bad_fieldlines
+        call exit (1)
+      end if
+c
+c ****** Print warning if there were bad field lines.
+c
+      if (nbad.gt.0) then
+        write (*,*) achar(10)//
+     &    '### WARNING from MAP_FORWARD:'//achar(10)//
+     &    '### Number of field lines that did not reach R0 or R1: ',
+     &    nbad
+      end if
 c
 c ****** Write the mapping.
 c
@@ -2735,7 +2710,6 @@ c
       use files
       use params
       use field_line_params
-      use diags
       use openmp_vars
       use tracefl_interface
 c
@@ -2771,8 +2745,6 @@ c
       real(r_typ) :: dtdt,dtdp,dpdt,dpdp
       real(r_typ) :: dt,dp,aa,bb,cc,dd,stm,stp,tmav,efav
       logical :: wrote_cr
-      integer :: n_completed,n_total,nc,diag_step
-      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -2800,20 +2772,14 @@ c
       ds%direction_is_along_b=.false.
       ds%direction=-1
 c
-      n_total=ntss*npss
-      n_completed=0
-c
 c$omp parallel do
 c$omp& default(shared)
 c$omp& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
-c$omp& private(nc,diag_step,pct_done)
-c$omp& shared(n_completed)
+c$omp& shared(nbad)
 c$omp& collapse(2)
 c$omp& schedule(dynamic,iterations_per_thread)
 !$acc parallel loop collapse(2) default(present)
 !$acc& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
-!$acc& private(nc,diag_step,pct_done)
-!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
 c
@@ -2842,12 +2808,6 @@ c
 c$omp critical (nbad_count)
 !$acc atomic update
             nbad=nbad+1
-            write (*,*) achar(10)//
-     &        '### WARNING from MAP_BACKWARD:'//achar(10)//
-     &        '### A field line did not reach R0 or R1.'//achar(10)//
-     &        'Initial theta = ',xfl0(2),achar(10)//
-     &        'Initial phi   = ',xfl0(3),achar(10)//
-     &        'Final field line radius = ',xfl1(1)
 c$omp end critical (nbad_count)
             rfl(j,k)=-1._r_typ
             tfl(j,k)=-1._r_typ
@@ -2857,39 +2817,30 @@ c$omp end critical (nbad_count)
             kfl(j,k)=-50._r_typ
           end if
 c
-          if (max_bad_fieldlines.gt.0) then
-            if (nbad.gt.max_bad_fieldlines) then
-c$omp critical (nbad2)
-              write (*,*) achar(10)//
-     &          '### ERROR in MAP_BACKWARD:'//achar(10)//
-     &          '### Too many field lines did not reach'//
-     &            ' R0 or R1.'//achar(10)//
-     &          'Number of bad traces = ',max_bad_fieldlines
-              call exit (1)
-c$omp end critical (nbad2)
-            end if
-          end if
-c
-c ****** Write progress diagnostics if requested.
-c
-          if (verbose.gt.0) then
-c$omp critical (omp_nc)
-!$acc atomic capture
-            n_completed=n_completed+1
-            nc = n_completed
-!$acc end atomic
-c$omp end critical (omp_nc)
-            diag_step=mod(nc,diagnostic_interval)
-            if (diag_step.eq.0) then
-              pct_done=100.0_r_typl*nc/n_total
-              write (*,*) 'Fraction completed: ',pct_done,'%'
-            end if
-          end if
-c
         enddo
       enddo
 !$acc end parallel
 c$omp end parallel do
+c
+c ****** Check for too many bad field lines and exit if needed.
+c
+      if (max_bad_fieldlines.gt.0.and.nbad.gt.max_bad_fieldlines) then
+        write (*,*) achar(10)//
+     &    '### ERROR in MAP_BACKWARD:'//achar(10)//
+     &    '### Too many field lines did not reach'//
+     &      ' R0 or R1.'//achar(10)//
+     &    'Number of bad traces = ',max_bad_fieldlines
+        call exit (1)
+      end if
+c
+c ****** Print warning if there were bad field lines.
+c
+      if (nbad.gt.0) then
+        write (*,*) achar(10)//
+     &    '### WARNING from MAP_BACKWARD:'//achar(10)//
+     &    '### Number of field lines that did not reach R0 or R1: ',
+     &    nbad
+      end if
 c
 c ****** Write the mapping.
 c
@@ -3195,7 +3146,6 @@ c
       use vars
       use files
       use params
-      use diags
       use openmp_vars
       use tracefl_interface
 c
@@ -3217,8 +3167,6 @@ c
       logical :: ttb
       real(r_typ) :: s
       logical :: wrote_cr
-      integer :: n_completed,n_total,nc,diag_step
-      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -3240,19 +3188,12 @@ c
       ds%direction_is_along_b=.false.
       ds%direction=-1
 c
-      n_total=nrss*ntss*npss
-      n_completed=0
-c
 c$omp parallel do
 c$omp& private(i,j,k,xfl0,xfl1,bs0,bs1,s,ttb)
-c$omp& private(nc,diag_step,pct_done)
-c$omp& shared(n_completed)
 c$omp& collapse(3)
 c$omp& schedule(dynamic,iterations_per_thread)
 !$acc parallel loop collapse(3)
 !$acc& private(i,j,k,xfl0,xfl1,bs0,bs1,s,ttb)
-!$acc& private(nc,diag_step,pct_done)
-!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
           do i=1,nrss
@@ -3270,22 +3211,6 @@ c
             end if
             tfl(i,j,k)=xfl1(2)
             pfl(i,j,k)=xfl1(3)
-c
-c ****** Write progress diagnostics if requested.
-c
-            if (verbose.gt.0) then
-c$omp critical
-!$acc atomic capture
-              n_completed=n_completed+1
-              nc = n_completed
-!$acc end atomic
-c$omp end critical
-              diag_step=mod(nc,diagnostic_interval)
-              if (diag_step.eq.0) then
-                pct_done=100.0_r_typl*nc/n_total
-                write (*,*) 'Fraction completed: ',pct_done,'%'
-              end if
-            end if
 c
           enddo
         enddo
@@ -3590,7 +3515,6 @@ c
       use files
       use params
       use sds_def
-      use diags
       use openmp_vars
       use tracefl_interface
       use debug
@@ -3624,8 +3548,6 @@ c
       real(r_typ) :: s
       type(flparam) :: ds_f,ds_b
       logical :: wrote_cr
-      integer :: n_completed,n_total,nc,diag_step
-      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -3742,19 +3664,12 @@ c ****** Trace a field line from each point on the slice until the
 c ****** field line hits the boundaries or exhausts the length
 c ****** allowed.
 c
-      n_total=n1*n2*n3
-      n_completed=0
-c
 c$omp parallel do
 c$omp& private(i,j,k,c,xfl0,xfl1,bs0,bs1,s,ttb)
-c$omp& private(nc,diag_step,pct_done)
-c$omp& shared(n_completed)
 c$omp& collapse(3)
 c$omp& schedule(dynamic,iterations_per_thread)
 !$acc parallel loop collapse(3)
 !$acc& private(i,j,k,c,xfl0,xfl1,bs0,bs1,s,ttb)
-!$acc& private(nc,diag_step,pct_done)
-!$acc& copy(n_completed)
       do k=1,n3
         do j=1,n2
           do i=1,n1
@@ -3836,22 +3751,6 @@ c
                 pfl_b(i,j,k)=xfl1(3)
               end if
 c
-            end if
-c
-c ****** Write progress diagnostics if requested.
-c
-            if (verbose.gt.0) then
-c$omp critical
-!$acc atomic capture
-              n_completed=n_completed+1
-              nc = n_completed
-!$acc end atomic
-c$omp end critical
-              diag_step=mod(nc,diagnostic_interval)
-              if (diag_step.eq.0) then
-                pct_done=100.0_r_typl*nc/n_total
-                write (*,*) 'Fraction completed: ',pct_done,'%'
-              end if
             end if
 c
           enddo
@@ -4224,7 +4123,6 @@ c
       use vars
       use files
       use params
-      use diags
       use openmp_vars
       use tracefl_interface
 c
@@ -4261,8 +4159,6 @@ c
       logical :: b_trace_on_r0,b_trace_on_r1
       logical :: f_br_positive
       logical :: b_br_positive
-      integer :: n_completed,n_total,nc,diag_step
-      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -4312,17 +4208,12 @@ c
         write (*,*)
       end if
 c
-      n_total=ntss*npss
-      n_completed=0
-c
 c$omp parallel do
 c$omp& private(j,k,xfl0,xfl1,bs0,bs1,s,ttb)
 c$omp& private(f_trace_reached_boundary,f_br_positive)
 c$omp& private(f_trace_on_r0,f_trace_on_r1)
 c$omp& private(b_trace_reached_boundary,b_br_positive)
 c$omp& private(b_trace_on_r0,b_trace_on_r1)
-c$omp& private(nc,diag_step,pct_done)
-c$omp& shared(n_completed)
 c$omp& collapse(2)
 c$omp& schedule(dynamic,iterations_per_thread)
 !$acc parallel loop collapse(2)
@@ -4331,8 +4222,6 @@ c$omp& schedule(dynamic,iterations_per_thread)
 !$acc& private(f_trace_on_r0,f_trace_on_r1)
 !$acc& private(b_trace_reached_boundary,b_br_positive)
 !$acc& private(b_trace_on_r0,b_trace_on_r1)
-!$acc& private(nc,diag_step,pct_done)
-!$acc& copy(n_completed)
       do k=1,npss
         do j=1,ntss
 c
@@ -4409,22 +4298,6 @@ c
             ch(k,j)=-two
           end if
 c
-c ****** Write progress diagnostics if requested.
-c
-          if (verbose.gt.0) then
-c$omp critical
-!$acc atomic capture
-            n_completed=n_completed+1
-            nc = n_completed
-!$acc end atomic
-c$omp end critical
-            diag_step=mod(nc,diagnostic_interval)
-            if (diag_step.eq.0) then
-              pct_done=100.0_r_typl*nc/n_total
-              write (*,*) 'Fraction completed: ',pct_done,'%'
-            end if
-          end if
-c
         enddo
       enddo
 !$acc end parallel
@@ -4467,7 +4340,6 @@ c
       use vars
       use files
       use params
-      use diags
       use openmp_vars
       use tracefl_interface
 c
@@ -4500,8 +4372,6 @@ c
       logical :: b_trace_on_r0,b_trace_on_r1
       logical :: f_br_positive
       logical :: b_br_positive
-      integer :: n_completed,n_total,nc,diag_step
-      real(r_typl) :: pct_done
 c
 c-----------------------------------------------------------------------
 c
@@ -4538,17 +4408,12 @@ c
         write (*,*)
       end if
 c
-      n_total=nrss*ntss*npss
-      n_completed=0
-c
 c$omp parallel do
 c$omp& private(i,j,k,xfl0,xfl1,bs0,bs1,s,ttb)
 c$omp& private(f_trace_reached_boundary,f_br_positive)
 c$omp& private(f_trace_on_r0,f_trace_on_r1)
 c$omp& private(b_trace_reached_boundary,b_br_positive)
 c$omp& private(b_trace_on_r0,b_trace_on_r1)
-c$omp& private(nc,diag_step,pct_done)
-c$omp& shared(n_completed)
 c$omp& collapse(3)
 c$omp& schedule(dynamic,iterations_per_thread)
 !$acc parallel loop collapse(3)
@@ -4557,8 +4422,6 @@ c$omp& schedule(dynamic,iterations_per_thread)
 !$acc& private(f_trace_on_r0,f_trace_on_r1)
 !$acc& private(b_trace_reached_boundary,b_br_positive)
 !$acc& private(b_trace_on_r0,b_trace_on_r1)
-!$acc& private(nc,diag_step,pct_done)
-!$acc& copy(n_completed)
       do i=1,nrss
         do k=1,npss
           do j=1,ntss
@@ -4634,22 +4497,6 @@ c
               end if
             else
               ch(i,j,k)=-two
-            end if
-c
-c ****** Write progress diagnostics if requested.
-c
-            if (verbose.gt.0) then
-c$omp critical
-!$acc atomic capture
-              n_completed=n_completed+1
-              nc = n_completed
-!$acc end atomic
-c$omp end critical
-              diag_step=mod(nc,diagnostic_interval)
-              if (diag_step.eq.0) then
-                pct_done=100.0_r_typl*nc/n_total
-                write (*,*) 'Fraction completed: ',pct_done,'%'
-              end if
             end if
 c
           enddo
@@ -10758,6 +10605,13 @@ c         - Added OpenACC for NVIDIA GPU offload with unified memory.
 c         - NOTE: This disables some error checking, some verbose 
 c           output, and saving field lines
 c         - This branch is designed to be used with SWiG.
+c
+c        01/21/2026, MS Version 2.3.1acc1.1:
+c
+c         - Removed all write statements and diagnostic counters from
+c           OpenACC parallel regions to improve performance.
+c         - Removed progress diagnostics and warning messages from within
+c           GPU parallel loops.
 c
 c-----------------------------------------------------------------------
 c
