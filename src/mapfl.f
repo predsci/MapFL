@@ -48,8 +48,8 @@ c-----------------------------------------------------------------------
 c
 c
       character(*), parameter :: cname='MAPFL'
-      character(*), parameter :: cvers='2.2.0'
-      character(*), parameter :: cdate='01/12/2026'
+      character(*), parameter :: cvers='2.3.1'
+      character(*), parameter :: cdate='06/03/2026'
 c
       end module
 c#######################################################################
@@ -1547,8 +1547,8 @@ c
         f(:,:,n3+1)=b%r%f(:,:,1)
         z(1:n3)=b%r%scales(3)%f(:)
         z(n3+1)=b%r%scales(3)%f(1)+twopi
-        deallocate (b%r%f)
-        deallocate (b%r%scales(3)%f)
+        nullify (b%r%f)
+        nullify (b%r%scales(3)%f)
         b%r%dims(3)=n3+1
         b%r%f=>f
         b%r%scales(3)%f=>z
@@ -1562,8 +1562,8 @@ c
         f(:,:,n3+1)=b%t%f(:,:,1)
         z(1:n3)=b%t%scales(3)%f(:)
         z(n3+1)=b%t%scales(3)%f(1)+twopi
-        deallocate (b%t%f)
-        deallocate (b%t%scales(3)%f)
+        nullify (b%t%f)
+        nullify (b%t%scales(3)%f)
         b%t%dims(3)=n3+1
         b%t%f=>f
         b%t%scales(3)%f=>z
@@ -1577,8 +1577,8 @@ c
         f(:,:,n3+1)=b%p%f(:,:,1)
         z(1:n3)=b%p%scales(3)%f(:)
         z(n3+1)=b%p%scales(3)%f(1)+twopi
-        deallocate (b%p%f)
-        deallocate (b%p%scales(3)%f)
+        nullify (b%p%f)
+        nullify (b%p%scales(3)%f)
         b%p%dims(3)=n3+1
         b%p%f=>f
         b%p%scales(3)%f=>z
@@ -5885,7 +5885,7 @@ c
       real(r_typ) :: ds0,dss,dsss,frac,dsmult_corrector
       real(r_typ) :: sf=1._r_typ,sf1,sf2
       logical :: done_tracing,first,nullb
-      integer :: idir0,n,ntry,max_n,max_ntry
+      integer :: idir0,n,ntry,max_n,max_ntry,n_xt,i
       type (csvec) :: x,xp,xo,bv,bhat1,bhat2
       type (inout) :: outside
       integer :: ierr
@@ -6177,6 +6177,7 @@ c
                    sf=half*(sf1+sf2)
                 endif
                 s=s+abs(dsss)*sf
+                if (store_trace) call add_trajectory_point (xt,x%s)
                 exit
 c
               end if
@@ -6379,6 +6380,17 @@ c
      &                   ds%short_fl_shrink_factor
           current_ds%max=current_ds%max*
      &                   ds%short_fl_shrink_factor
+c
+c ****** Reset the trace buffer
+c
+          if (store_trace.and.(.not.(ntry.ge.max_ntry))) then
+            do n_xt=1,xt%npts
+              do i=1,xt%ndim
+                xt%x(i)%f(n_xt)=0.0
+              enddo
+            enddo
+            xt%npts=0
+          endif
 c
         else
           exit !Break out of max_ntry loop if line had enough points.
@@ -10674,6 +10686,10 @@ c           (set greater than 0 to activate).
 c         - Changed command line.  Now, use as: mapfl INFILE
 c           If INFILE is not supplied, it defaults to "mapfl.in".
 c         - Added number_types module.
+c
+c        06/03/2026, CD Version 2.3.1:
+c         - Merge small fixes to tracefl trajectories & pointer
+c           allocations from out-of-sync mapflpy version.
 c
 c-----------------------------------------------------------------------
 c
