@@ -492,6 +492,14 @@ c ****** Integrate scalar field along field line.
 c
       logical :: integrate_along_fl=.false.
 c
+c ****** Weight the scalar field integral by area.
+c
+      logical :: weight_integral_by_area=.false.
+c
+c ****** Evaluate maximum value on scalar along field line.
+c
+      logical :: max_along_fl=.false.
+c
       end module
 c#######################################################################
       module diags
@@ -731,7 +739,8 @@ c
 c
       implicit none
 c
-      logical :: do_integral_along_fl=.false.
+      logical :: do_integral_along_fl=.false.,do_max_along_fl=.false.
+      logical :: do_weight_by_area=.false.
       type(sds) :: scalar_field
       type(vtab) :: inv_sf
 
@@ -849,6 +858,7 @@ c
      &  write_traces_to_hdf, write_traces_root, write_traces_as_xyz,
      &  compute_dips_map_3d, dips_map_3d_output_file, ns_dips,
      &  slogqffile,slogqbfile,integrate_along_fl,scalar_input_file,
+     &  weight_integral_by_area, max_along_fl,
      &  verbose, function_index, function_b0, function_mu
 c
 c-----------------------------------------------------------------------
@@ -966,7 +976,14 @@ c
 c
 c ****** Setup the field to integrate along if requested.
 c
-      if (integrate_along_fl) call set_up_integration
+      if (integrate_along_fl.and.max_along_fl) then
+        write (*,*)
+        write (*,*) '### ERROR in MAPFL:'
+        write (*,*) '### The integrate_along_fl and max_along_fl'//
+     &              ' option cannot both be true'
+        call exit (1)
+      endif 
+      if (integrate_along_fl.or.max_along_fl) call set_up_scalar_field
 c
 c ****** Trace the field lines forward, if requested.
 c
@@ -3588,6 +3605,10 @@ c
       real(r_typ), dimension(:,:,:), allocatable, target :: tfl_b
       real(r_typ), dimension(:,:,:), allocatable, target :: pfl_b
 c
+c ****** Storage for the backward mapping.
+c
+      real(r_typ), dimension(:,:,:), allocatable, target :: length
+c
 c-----------------------------------------------------------------------
 c
       type (sds) :: out
@@ -3598,7 +3619,7 @@ c
       logical :: ttb
       real(r_typ) :: s
       type(flparam) :: ds_f,ds_b
-      logical :: wrote_cr
+      logical :: wrote_cr,save_field_line_length
       integer :: n_completed,n_total,nc,diag_step
       real(r_typ) :: pct_done
 c
@@ -3681,6 +3702,25 @@ c
         allocate (pfl_b(n1,n2,n3))
       end if
 c
+c ****** Set a flag to indicate if the field line length 
+c ****** was requested.
+c
+      if (slice_length_output_file.ne.' ') then
+        save_field_line_length=.true.
+      else 
+        save_field_line_length=.false.
+      end if
+c
+c ****** Allocate the storage for the output field line
+c ****** length, if requested.
+c     
+      if (save_field_line_length) then
+        allocate (length(n1,n2,n3))
+        do concurrent (k=1:n3, j=1:n2, i=1:n1)
+          length(i,j,k)=0._r_typ
+        enddo 
+      end if
+c
 c ****** Allocate the field line storage buffers if the field
 c ****** line traces are being written to HDF files.
 c
@@ -3761,6 +3801,10 @@ c
                 call tracefl (b,ds_f,xfl0,xfl1,bs0,bs1,s,ttb)
               end if
 c
+              if (save_field_line_length) then
+                length(i,j,k)=s
+              end if
+c
               if (slice_coords_are_xyz) then
                 if (ttb) then
                   call s2c (xfl1,c)
@@ -3793,6 +3837,10 @@ c
      &                        xtb(i,j,k))
               else
                 call tracefl (b,ds_b,xfl0,xfl1,bs0,bs1,s,ttb)
+              end if
+c
+              if (save_field_line_length) then
+                length(i,j,k)=s+length(i,j,k)
               end if
 c
               if (slice_coords_are_xyz) then
@@ -4026,6 +4074,36 @@ c
      &                slice_coord_name(3)//'.'
           call exit (1)
         end if
+      end if
+c
+c ****** Write the field line length, if requested.
+c
+      if (save_field_line_length) then
+        out%ndim=slice_c1%ndim
+        out%dims=slice_c1%dims
+        out%scale=slice_c1%scale
+        out%hdf32=slice_c1%hdf32
+        out%scales(1)%f=>slice_c1%scales(1)%f
+        out%scales(2)%f=>slice_c1%scales(2)%f
+        out%scales(3)%f=>slice_c1%scales(3)%f
+        out%f=>length
+        if (verbose.gt.0) then
+          write (*,*) 'Writing field line length in'//
+     &                ' the slice to file: ',
+     &                trim(slice_length_output_file)
+        end if
+        call wrhdf (slice_length_output_file,out,ierr)
+        if (ierr.ne.0) then
+          write (*,*)
+          write (*,*) '### ERROR in MAP_SLICE:'
+          write (*,*) '### Could not write the field line'//
+     &                ' length in the slice to file: ',
+     &                trim(slice_length_output_file)
+          call exit (1)
+        end if
+c
+        deallocate (length)
+c
       end if
 c
 c ****** Write the forward field line traces to individual HDF
@@ -5883,12 +5961,13 @@ c-----------------------------------------------------------------------
 c
       logical :: store_trace
       real(r_typ) :: ds0,dss,dsss,frac,dsmult_corrector
-      real(r_typ) :: sf=1._r_typ,sf1,sf2
+      real(r_typ) :: sf=1._r_typ,sf1,sf2,bmag1,bmag2
       logical :: done_tracing,first,nullb
       integer :: idir0,n,ntry,max_n,max_ntry,n_xt,i
-      type (csvec) :: x,xp,xo,bv,bhat1,bhat2
+      type (csvec) :: x,xp,xo,bv,bhat1,bhat2,bv1,bv2
       type (inout) :: outside
       integer :: ierr
+      real(r_typ) :: arc_length
       real(r_typ) :: arc_length_remaining,ds_b
       type(flparam) :: current_ds
       logical :: tfc
@@ -5948,7 +6027,12 @@ c
 c
         x%s=s0
         call sph_to_cart (x)
-        s=0.
+        if (do_max_along_fl) then
+          s=-huge(one)
+        else
+          s=0.
+        endif
+        arc_length = 0.
         if (store_trace) call add_trajectory_point (xt,x%s)
 c
 c ****** Set the starting step size.
@@ -6040,7 +6124,7 @@ c
 c ****** Check to see if this trace segment ends the trace
 c ****** (i.e., exceeds the arc length specified, DS%LMAX).
 c
-          arc_length_remaining=ds%lmax-s
+          arc_length_remaining=ds%lmax-arc_length
 c
           if (ds0.ge.arc_length_remaining) then
             dss=arc_length_remaining
@@ -6171,12 +6255,27 @@ c
                 dsss=frac*dsss
                 traced_to_r_boundary=.true.
                 done_tracing=.true.
-                if (do_integral_along_fl) then
-                   call getsf (xo,sf1)
-                   call getsf (xp,sf2)
-                   sf=half*(sf1+sf2)
+                arc_length = arc_length + abs(dsss)
+                if (do_integral_along_fl.or.do_max_along_fl) then
+                  call getsf (xo,sf1)
+                  call getsf (xp,sf2)
+                  if (do_weight_by_area) then
+                     call getb (b,xo,bv1)
+                     call getb (b,xp,bv2)
+                     call magnitude_v(bv1,bmag1,nullb)
+                     call magnitude_v(bv2,bmag2,nullb)
+                     sf1 = sf1/bmag1
+                     sf2 = sf2/bmag2
+                  endif
+                  sf=half*(sf1+sf2)
+                  if (do_max_along_fl) then
+                    s=max(sf,s)
+                  else
+                    s=s+abs(dsss)*sf
+                  endif
+                else
+                  s = arc_length
                 endif
-                s=s+abs(dsss)*sf
                 if (store_trace) call add_trajectory_point (xt,x%s)
                 exit
 c
@@ -6333,14 +6432,30 @@ c
             end if
           end if
 c
-c ****** Increment the number of points and the arc length.
+c ****** Increment the number of points, the arc length, and
+c ****** the scalar field.
 c
-          if (do_integral_along_fl) then
+          arc_length = arc_length + abs(dsss)
+          if (do_integral_along_fl.or.do_max_along_fl) then
             call getsf (xo,sf1)
             call getsf (x,sf2)
+            if (do_weight_by_area) then
+              call getb (b,xo,bv1)
+              call getb (b,x,bv2)
+              call magnitude_v(bv1,bmag1,nullb)
+              call magnitude_v(bv2,bmag2,nullb)
+              sf1 = sf1/bmag1
+              sf2 = sf2/bmag2
+            endif
             sf=half*(sf1+sf2)
+            if (do_max_along_fl) then
+              s=max(sf,s)
+            else
+              s=s+abs(dsss)*sf
+            endif
+          else
+            s = arc_length
           endif
-          s=s+abs(dsss)*sf
 c
 c ****** Add the current position to the field line buffer
 c ****** if requested.
@@ -6649,6 +6764,46 @@ c
         null=.false.
         v%c=v%c/vmag
         v%s=v%s/vmag
+      end if
+c
+      return
+      end
+c#######################################################################
+      subroutine magnitude_v (v,vmag,null)
+c
+c-----------------------------------------------------------------------
+c
+c ****** Compute the magnitude |V| of the vector V.
+c ****** If V has zero length, then set NULL=.T.
+c
+c-----------------------------------------------------------------------
+c
+      use number_types
+      use types
+c
+c-----------------------------------------------------------------------
+c
+      implicit none
+c
+c-----------------------------------------------------------------------
+c
+      type(csvec) :: v
+      logical :: null
+c
+c-----------------------------------------------------------------------
+c
+      real(r_typ) :: vmag
+c
+c-----------------------------------------------------------------------
+c
+c ****** Use the spherical representation to compute the norm.
+c
+      vmag=sqrt(v%s(1)**2+v%s(2)**2+v%s(3)**2)
+c
+      if (vmag.eq.0.) then
+        null=.true.
+      else
+        null=.false.
       end if
 c
       return
@@ -10108,7 +10263,7 @@ c
       return
       end
 c#######################################################################
-      subroutine set_up_integration
+      subroutine set_up_scalar_field 
 c
 c-----------------------------------------------------------------------
 c
@@ -10133,7 +10288,14 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      do_integral_along_fl=.true.
+      if (integrate_along_fl) then
+        do_integral_along_fl=.true.
+        if (weight_integral_by_area) then
+          do_weight_by_area=.true.
+        endif
+      else if (max_along_fl) then
+        do_max_along_fl=.true.
+      endif
 c
 c ****** Read the scalar field
 c
@@ -10146,16 +10308,16 @@ c
 c
       if (ierr.ne.0) then
         write (*,*)
-        write (*,*) '### ERROR in SET_UP_INTEGRATION:'
+        write (*,*) '### ERROR in SET_UP_SCALAR_FIELD:'
         write (*,*) '### Could not read scalar field.'
-        write (*,*) 'IERR (from RDHDF) = ',ierr
+        write (*,*) 'IERR (from RDHDF_3D) = ',ierr
         write (*,*) 'File name: ',trim(scalar_input_file)
         call exit (1)
       end if
 c
       if (scalar_field%ndim.ne.3.or..not.scalar_field%scale)  then
         write (*,*)
-        write (*,*) '### ERROR in SET_UP_INTEGRATION:'
+        write (*,*) '### ERROR in SET_UP_SCALAR_FIELD:'
         write (*,*) '### Invalid or missing scales in scalar file.'
         write (*,*) 'File name: ',trim(scalar_input_file)
         call exit (1)
@@ -10692,6 +10854,14 @@ c         - Merge small fixes to tracefl trajectories & pointer
 c           allocations from out-of-sync mapflpy version.
 c         - Rename magnetic field function b0 and mu to function_b0 and
 c           function_my to avoid name conflicts.
+c         - Merge update from mapflpy-dev (RL 11/11/2025, 2.0.16)
+c           - Added capability to save the length of field lines in
+c             calculations on slices.
+c         - Merge update from mapflpy-dev (CD 09/07/2024 2.0.12)
+c           - Added WEIGHT_INTEGRAL_BY_AREA option to weight the scalar 
+c             field integral by the proportional flux tube area (1/b).
+c         - Track arc length separately so lmax still works for
+c           scalar field integrations.
 c
 c-----------------------------------------------------------------------
 c
