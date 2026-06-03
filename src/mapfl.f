@@ -784,11 +784,11 @@ c
 c
 c ****** Parameters for the DIPOLE function.
 c
-      real(r_typ) :: b0=1._r_typ
+      real(r_typ) :: function_b0=1._r_typ
 c
 c ****** Parameters for the PFSS_BKG function.
 c
-      real(r_typ) :: mu
+      real(r_typ) :: function_mu
       real(r_typ) :: rss
 c
       end module
@@ -849,7 +849,7 @@ c
      &  write_traces_to_hdf, write_traces_root, write_traces_as_xyz,
      &  compute_dips_map_3d, dips_map_3d_output_file, ns_dips,
      &  slogqffile,slogqbfile,integrate_along_fl,scalar_input_file,
-     &  verbose, function_index, b0, mu
+     &  verbose, function_index, function_b0, function_mu
 c
 c-----------------------------------------------------------------------
 c
@@ -864,7 +864,7 @@ c
         infile='mapfl.in'
       end if
 c
-      call ffopen (8,infile,'r',ierr)
+      call ffopen (8,trim(infile),'r',ierr)
 c
       if (ierr.ne.0) then
         write (*,*)
@@ -10219,13 +10219,13 @@ c
 c
       select case (function_index)
       case (FUNC_TYPE_DIPOLE)
-        v(1)=two*b0*cos(t)/r**3
-        v(2)=b0*sin(t)/r**3
+        v(1)=two*function_b0*cos(t)/r**3
+        v(2)=function_b0*sin(t)/r**3
         v(3)=0.
       case (FUNC_TYPE_PFSS_BKG)
-        v(1)=br_pfss_bkg(r,t,p,mu,rss)
-        v(2)=bt_pfss_bkg(r,t,p,mu,rss)
-        v(3)=bp_pfss_bkg(r,t,p,mu,rss)
+        v(1)=br_pfss_bkg(r,t,p,function_mu,rss)
+        v(2)=bt_pfss_bkg(r,t,p,function_mu,rss)
+        v(3)=bp_pfss_bkg(r,t,p,function_mu,rss)
       case default
         write (*,*)
         write (*,*) '### ERROR in MAGNETIC_FIELD_FUNCTION:'
@@ -10639,7 +10639,7 @@ c        08/19/2019, RL, Version 2.04:
 c
 c         - Introduced capability to integrate scalar field along
 c           field lines.
-c           Speficy INTEGRATE_ALONG_FL=.true. and the name of the
+c           Specify INTEGRATE_ALONG_FL=.true. and the name of the
 c           file with the field in SCALAR_INPUT_FILE
 c           Either TRACE_FWD, or TRACE_BWD, or TRACE_SLICE and
 c           COMPUTE_Q_ON_SLICE, must be set true.
@@ -10690,6 +10690,8 @@ c
 c        06/03/2026, CD Version 2.3.1:
 c         - Merge small fixes to tracefl trajectories & pointer
 c           allocations from out-of-sync mapflpy version.
+c         - Rename magnetic field function b0 and mu to function_b0 and
+c           function_my to avoid name conflicts.
 c
 c-----------------------------------------------------------------------
 c
